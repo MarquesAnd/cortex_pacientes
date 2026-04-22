@@ -585,7 +585,14 @@ function ModalAgendarSessao({ pacientes, onClose, onSaved, profile, user, presel
 
 Object.assign(window, { App, TweaksPanel, TestCatalogView, PatientsViewWithToggle, ModalNovoPaciente, ModalAgendarSessao, rowToPaciente, rowToCalendar });
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// Garantir que o App só renderiza após todos os scripts estarem prontos
+(function renderApp() {
+  if (typeof window.App === 'function' && window.CORTEX_DATA) {
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  } else {
+    setTimeout(renderApp, 50);
+  }
+})();
 </script>
 </body>
 </html>
