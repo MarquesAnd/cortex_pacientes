@@ -124,36 +124,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 // ── Calendário (vazio — vem do Supabase) ─────────────────────
 const CALENDAR = [];
 
-// ── Pacientes iniciais (mock — substituídos pelo Supabase) ───
-function p(d) { return { id: d.id, criadoEm: d.criadoEm || "2026-03-15", ativo: d.ativo !== false, ...d }; }
-
-const PATIENTS = [
-  p({
-    id: "pac-01", nome: "Helena Ribeiro Campos", idade: 9, dataNasc: "2016-08-14",
-    cpf: "***.***.***-12", escolaridade: "4º ano EF", escola: "Colégio Nova Era",
-    tipo: "Criança", responsavel: "Mariana Campos (mãe)", telefone: "(11) 98421-0022",
-    email: "mariana.campos@email.com", endereco: "Rua Itambé, 420 — SP",
-    convenio: "Particular", encaminhadoPor: "Dra. Sofia Lins (neuropediatra)",
-    queixa: "Dificuldade de atenção em sala, lentidão acadêmica, recusa em atividades escritas.",
-    estagio: "testes", progresso: 58, inicio: "2026-02-10", previsaoLaudo: "2026-05-05",
-    diasNaEtapa: 12, corAvatar: "violet",
-    testes: [
-      { id: "wisc4",   status: "aplicado",  prevista: "2026-03-15", aplicada: "2026-03-15" },
-      { id: "bpa2",    status: "aplicado",  prevista: "2026-03-20", aplicada: "2026-03-20" },
-      { id: "ravlt",   status: "agendado",  prevista: "2026-04-28", aplicada: null },
-      { id: "snap4",   status: "pendente",  prevista: "2026-04-30", aplicada: null },
-    ],
-    hipoteses: [
-      { id: "h1", titulo: "TDAH — Apresentação Combinada", status: "em-investigacao", peso: 3, evidencias: ["WISC-IV: FDI baixo", "TAVIS-4: pendente"] },
-      { id: "h2", titulo: "Dislexia / DEA Leitura",        status: "em-investigacao", peso: 2, evidencias: ["Relato escolar", "TDE-II: pendente"] },
-    ],
-    anamnese: { completude: 75, secoes: { identificacao: true, queixa: true, desenvolvimento: true, familia: false, escolar: true, saude: true, social: false, medicacoes: false } },
-    sessoes: [
-      { data: "2026-04-28", hora: "09:00", duracao: 60, titulo: "Aplicação RAVLT", tipo: "Aplicação" },
-      { data: "2026-05-02", hora: "10:00", duracao: 90, titulo: "Fechamento bateria", tipo: "Aplicação" },
-    ],
-    relatorioEscolar: { recebido: true, data: "2026-03-20", resumo: "A coordenação sinaliza oscilações no desempenho em atividades de leitura e dificuldade em sustentar atenção em tarefas longas." },
-  }),
-];
+// Pacientes carregados do Supabase via hydratePacientes()
+const PATIENTS = [];
 
 window.CORTEX_DATA = { TEST_CATALOG, STAGES, TODAY, PATIENTS, CALENDAR };

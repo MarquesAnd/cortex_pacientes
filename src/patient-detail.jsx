@@ -853,8 +853,8 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
   const inp = {width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'inherit', fontSize:13, outline:'none'};
   const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
   const { STAGES } = window.CORTEX_DATA;
-  const conveniosSalvos = (() => { try { return JSON.parse(localStorage.getItem('cortex.config.geral') || '{}').convenios || []; } catch { return []; } })();
-  const convenioOpts = conveniosSalvos.length > 0 ? conveniosSalvos.filter(c=>c.ativo).map(c=>c.nome) : ['Particular','Unimed','Bradesco Saúde','SulAmérica','Amil','Hapvida','NotreDame','GNDI'];
+  // Convênios do banco (cache localStorage sincronizado com Supabase via hydratePacientes)
+  const convenioOpts = window.getConveniosAtivos?.() || ['Particular','Unimed','Bradesco Saúde','Amil','Hapvida'];
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
