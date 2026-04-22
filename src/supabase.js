@@ -216,6 +216,18 @@ async function upsertRelatorioEscolar(pacienteId, clinicaId, patch) {
 }
 
 // Expor tudo globalmente
+// ── Configurações da clínica ─────────────────────────────────
+async function fetchClinica(clinicaId) {
+  const rows = await sbRest(`/clinicas?id=eq.${clinicaId}&select=*`);
+  return rows[0] || null;
+}
+async function updateClinica(clinicaId, patch) {
+  return sbRest(`/clinicas?id=eq.${clinicaId}`, {
+    method: 'PATCH', prefer: 'return=representation',
+    body: JSON.stringify(patch),
+  });
+}
+
 window.CORTEX_SB = {
   sbSession, sbSetSession,
   cortexSignIn, cortexSignUp, cortexSignOut, cortexGetMe, cortexGetProfile, cortexUpdateProfile,
@@ -225,4 +237,5 @@ window.CORTEX_SB = {
   fetchTestesPaciente, createTestePaciente, updateTestePaciente, deleteTestePaciente,
   fetchAnamnese, upsertAnamnese,
   fetchRelatorioEscolar, upsertRelatorioEscolar,
+  fetchClinica, updateClinica,
 };

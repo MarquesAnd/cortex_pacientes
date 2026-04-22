@@ -75,12 +75,20 @@ function App() {
   // Data hydrate
   const hydratePacientes = async (clinicaId) => {
     try {
-      const [pacs, sess] = await Promise.all([
+      const [pacs, sess, clinica] = await Promise.all([
         window.CORTEX_SB.fetchPacientes(clinicaId),
         window.CORTEX_SB.fetchSessoes(clinicaId),
+        window.CORTEX_SB.fetchClinica(clinicaId),
       ]);
       if (pacs && pacs.length > 0) window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
       if (sess && sess.length > 0) window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
+      // Cachear config da clínica no localStorage para uso offline/rápido
+      if (clinica?.convenios?.length || clinica?.etapas_fluxo?.length) {
+        localStorage.setItem('cortex.config.geral', JSON.stringify({
+          convenios: clinica.convenios || [],
+          etapas: clinica.etapas_fluxo || [],
+        }));
+      }
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
     } catch (e) { console.warn('hydratePacientes', e); }
   };
@@ -380,6 +388,15 @@ function rowToCalendar(r) {
   };
 }
 window.rowToPaciente = rowToPaciente;
+
+// Helper global: lista convênios ativos (cache localStorage ou defaults)
+window.getConveniosAtivos = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('cortex.config.geral') || '{}');
+    if (saved.convenios?.length) return saved.convenios.filter(c => c.ativo).map(c => c.nome);
+  } catch {}
+  return ['Particular','Unimed','Bradesco Saúde','SulAmérica','Amil','Hapvida','GNDI'];
+};
 window.rowToCalendar = rowToCalendar;
 
 // ── Modal Novo Paciente ───────────────────────────────────────
@@ -653,59 +670,78 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
   };
   // ── Aba Geral ───────────────────────────────────────────────
   const GeralTab = () => {
-    // Convênios
-    const STORAGE_KEY = 'cortex.config.geral';
-    const loadConfig = () => {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
-    };
-    const saved = loadConfig();
-    const [convenios, setConvenios] = React.useState(saved.convenios || [
+    const DEFAULTS_CONVENIOS = [
       { id: 1, nome: 'Particular', ativo: true },
       { id: 2, nome: 'Unimed', ativo: true },
       { id: 3, nome: 'Bradesco Saúde', ativo: true },
-    ]);
+    ];
+    const DEFAULTS_ETAPAS = ['Anamnese','Hipóteses','Checklist','Bateria de Testes','Correção','Laudo','Devolutiva'];
+
+    const [convenios, setConvenios] = React.useState(DEFAULTS_CONVENIOS);
+    const [etapas, setEtapas] = React.useState(DEFAULTS_ETAPAS);
     const [novoConvenio, setNovoConvenio] = React.useState('');
-    const [etapas, setEtapas] = React.useState(saved.etapas || [
-      'Anamnese','Hipóteses','Checklist','Bateria de Testes','Correção','Laudo','Devolutiva'
-    ]);
     const [novaEtapa, setNovaEtapa] = React.useState('');
     const [msgG, setMsgG] = React.useState('');
+    const [loading, setLoading] = React.useState(true);
 
-    const saveConfig = (data) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      setMsgG('✓ Salvo!'); setTimeout(() => setMsgG(''), 2000);
+    // Carregar do Supabase ao montar
+    React.useEffect(() => {
+      if (!profile?.clinica_id) { setLoading(false); return; }
+      SB.fetchClinica(profile.clinica_id)
+        .then(clinica => {
+          if (clinica?.convenios?.length)   setConvenios(clinica.convenios);
+          if (clinica?.etapas_fluxo?.length) setEtapas(clinica.etapas_fluxo);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }, []);
+
+    const saveConfig = async (newConvenios, newEtapas) => {
+      try {
+        await SB.updateClinica(profile.clinica_id, {
+          convenios: newConvenios,
+          etapas_fluxo: newEtapas,
+        });
+        // Também salvar no localStorage como cache local
+        localStorage.setItem('cortex.config.geral', JSON.stringify({ convenios: newConvenios, etapas: newEtapas }));
+        setMsgG('✓ Salvo!'); setTimeout(() => setMsgG(''), 2000);
+      } catch(e) {
+        setMsgG('⚠ Erro ao salvar: ' + e.message); setTimeout(() => setMsgG(''), 4000);
+      }
     };
 
     const addConvenio = () => {
       if (!novoConvenio.trim()) return;
       const updated = [...convenios, { id: Date.now(), nome: novoConvenio.trim(), ativo: true }];
       setConvenios(updated);
-      saveConfig({ convenios: updated, etapas });
+      saveConfig(updated, etapas);
       setNovoConvenio('');
     };
     const toggleConvenio = (id) => {
       const updated = convenios.map(c => c.id === id ? {...c, ativo: !c.ativo} : c);
       setConvenios(updated);
-      saveConfig({ convenios: updated, etapas });
+      saveConfig(updated, etapas);
     };
     const removeConvenio = (id) => {
       const updated = convenios.filter(c => c.id !== id);
       setConvenios(updated);
-      saveConfig({ convenios: updated, etapas });
+      saveConfig(updated, etapas);
     };
 
     const addEtapa = () => {
       if (!novaEtapa.trim()) return;
       const updated = [...etapas, novaEtapa.trim()];
       setEtapas(updated);
-      saveConfig({ convenios, etapas: updated });
+      saveConfig(convenios, updated);
       setNovaEtapa('');
     };
     const removeEtapa = (i) => {
       const updated = etapas.filter((_, idx) => idx !== i);
       setEtapas(updated);
-      saveConfig({ convenios, etapas: updated });
+      saveConfig(convenios, updated);
     };
+
+    if (loading) return <div style={{color:'var(--text-3)', padding:20}}>Carregando configurações...</div>;
 
     const inp = {flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'inherit', fontSize:14, outline:'none'};
     const addBtn = {padding:'10px 18px', borderRadius:8, border:'none', background:'var(--teal-500)', color:'white', fontWeight:600, cursor:'pointer', fontSize:13, whiteSpace:'nowrap'};
