@@ -34,47 +34,13 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 function App() {
-  // Auth guard
+  // ── TODOS os hooks ANTES de qualquer return ──────────────────
+  // Auth state
   const [authReady, setAuthReady] = React.useState(false);
   const [user, setUser] = React.useState(null);
   const [profile, setProfile] = React.useState(null);
 
-  React.useEffect(() => {
-    (async () => {
-      const me = await window.CORTEX_SB.cortexGetMe().catch(() => null);
-      if (!me) { window.location.href = 'Login.html'; return; }
-      setUser(me);
-      const prof = await window.CORTEX_SB.cortexGetProfile(me.id).catch(() => null);
-      setProfile(prof);
-      if (prof?.clinica_id) {
-        await hydratePacientes(prof.clinica_id);
-      }
-      setAuthReady(true);
-    })();
-    const onSessaoChanged = () => {};
-    window.addEventListener('cortex-session-changed', (e) => {
-      if (!e.detail) window.location.href = 'Login.html';
-    });
-  }, []);
-
-  const hydratePacientes = async (clinicaId) => {
-    try {
-      const [pacs, sess] = await Promise.all([
-        window.CORTEX_SB.fetchPacientes(clinicaId),
-        window.CORTEX_SB.fetchSessoes(clinicaId),
-      ]);
-      // Substituir os dados mock pelos dados reais
-      if (pacs && pacs.length > 0) {
-        window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
-      }
-      if (sess && sess.length > 0) {
-        window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
-      }
-      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
-    } catch (e) { console.warn('hydratePacientes', e); }
-  };
-
-  // Load persisted
+  // UI state
   const stored = (() => { try { return JSON.parse(localStorage.getItem('cortex.state') || '{}'); } catch { return {}; } })();
   const [theme, setTheme] = React.useState(stored.theme || TWEAK_DEFAULTS.theme);
   const [density, setDensity] = React.useState(stored.density || TWEAK_DEFAULTS.density);
@@ -85,23 +51,47 @@ function App() {
   const [editMode, setEditMode] = React.useState(false);
   const [, tick] = React.useReducer(x => x + 1, 0);
 
+  // Modal state
+  const [showPacienteModal, setShowPacienteModal] = React.useState(false);
+  const [showSessaoModal, setShowSessaoModal]     = React.useState(false);
+  const [preselectPacId, setPreselectPacId]       = React.useState(null);
+
+  // Auth effect
+  React.useEffect(() => {
+    (async () => {
+      const me = await window.CORTEX_SB.cortexGetMe().catch(() => null);
+      if (!me) { window.location.href = 'Login.html'; return; }
+      setUser(me);
+      const prof = await window.CORTEX_SB.cortexGetProfile(me.id).catch(() => null);
+      setProfile(prof);
+      if (prof?.clinica_id) await hydratePacientes(prof.clinica_id);
+      setAuthReady(true);
+    })();
+    window.addEventListener('cortex-session-changed', (e) => {
+      if (!e.detail) window.location.href = 'Login.html';
+    });
+  }, []);
+
+  // Data hydrate
+  const hydratePacientes = async (clinicaId) => {
+    try {
+      const [pacs, sess] = await Promise.all([
+        window.CORTEX_SB.fetchPacientes(clinicaId),
+        window.CORTEX_SB.fetchSessoes(clinicaId),
+      ]);
+      if (pacs && pacs.length > 0) window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
+      if (sess && sess.length > 0) window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+    } catch (e) { console.warn('hydratePacientes', e); }
+  };
+
+  // Data update listener
   React.useEffect(() => {
     window.addEventListener('cortex-data-updated', tick);
     return () => window.removeEventListener('cortex-data-updated', tick);
   }, []);
 
-  if (!authReady) return (
-    <div style={{display:'grid', placeItems:'center', height:'100vh', background:'var(--bg)'}}>
-      <div style={{textAlign:'center'}}>
-        <div style={{width:48,height:48,borderRadius:12,overflow:'hidden',margin:'0 auto 16px'}}>
-          <img src="assets/cortex-logo.png" style={{width:'100%'}} />
-        </div>
-        <div style={{color:'var(--text-3)', fontSize:14}}>Carregando...</div>
-      </div>
-    </div>
-  );
-
-  // Persist
+  // Persist state
   React.useEffect(() => {
     localStorage.setItem('cortex.state', JSON.stringify({ theme, density, onlyActive, page, patientsView, selectedPatient }));
   }, [theme, density, onlyActive, page, patientsView, selectedPatient]);
@@ -123,18 +113,23 @@ function App() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const { PATIENTS } = window.CORTEX_DATA;
-  const activeCount = PATIENTS.filter(p => p.ativo).length;
-
+  // ── Handlers ───────────────────────────────────────────────
   const openPatient = (id) => { setSelectedPatient(id); setPage('patient'); };
   const backToList = () => { setSelectedPatient(null); setPage('pacientes'); };
-
-  const [showPacienteModal, setShowPacienteModal] = React.useState(false);
-  const [showSessaoModal, setShowSessaoModal]   = React.useState(false);
-  const [preselectPacId, setPreselectPacId]     = React.useState(null);
-
   const openSessaoModal = (pacId = null) => { setPreselectPacId(pacId); setShowSessaoModal(true); };
   const openPacienteModal = () => setShowPacienteModal(true);
+
+  // ── Loading screen (DEPOIS de todos os hooks) ───────────────
+  if (!authReady) return (
+    <div style={{display:'grid', placeItems:'center', height:'100vh', background:'var(--bg)'}}>
+      <div style={{textAlign:'center'}}>
+        <div style={{width:48,height:48,borderRadius:12,overflow:'hidden',margin:'0 auto 16px'}}>
+          <img src="assets/cortex-logo.png" style={{width:'100%'}} />
+        </div>
+        <div style={{color:'var(--text-3)', fontSize:14}}>Carregando...</div>
+      </div>
+    </div>
+  );
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <I.dash />, count: null },
