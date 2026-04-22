@@ -7,6 +7,16 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
   const pac = PATIENTS.find(p => p.id === patientId);
   const [tab, setTab] = React.useState('anamnese');
   const [editando, setEditando] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  const deletarPaciente = async () => {
+    try {
+      await window.CORTEX_SB.deletePaciente(pac.id);
+      window.CORTEX_DATA.PATIENTS = window.CORTEX_DATA.PATIENTS.filter(p => p.id !== pac.id);
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      onBack();
+    } catch(e) { alert('Erro ao deletar: ' + e.message); }
+  };
 
   if (!pac) return <div>Paciente não encontrado</div>;
 
@@ -20,6 +30,30 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
           onClose={() => setEditando(false)}
           onSaved={() => setEditando(false)}
         />
+      )}
+
+      {confirmDelete && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+          <div style={{background:'var(--surface)',borderRadius:16,padding:32,width:'min(440px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid color-mix(in oklab,var(--danger) 30%,var(--border))'}}>
+            <div style={{width:48,height:48,borderRadius:12,background:'color-mix(in oklab,var(--danger) 12%,var(--surface))',display:'grid',placeItems:'center',marginBottom:16}}>
+              <I.trash style={{width:22,height:22,color:'var(--danger)'}} />
+            </div>
+            <h3 style={{margin:'0 0 8px',fontSize:18}}>Deletar paciente?</h3>
+            <p style={{margin:'0 0 24px',color:'var(--text-2)',fontSize:14,lineHeight:1.55}}>
+              Esta ação é <strong>irreversível</strong>. Todos os dados de <strong>{pac.nome}</strong> serão permanentemente removidos — anamnese, hipóteses, testes e sessões.
+            </p>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button onClick={() => setConfirmDelete(false)}
+                style={{padding:'10px 20px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:14,fontWeight:500}}>
+                Cancelar
+              </button>
+              <button onClick={deletarPaciente}
+                style={{padding:'10px 20px',borderRadius:8,border:'none',background:'var(--danger)',color:'white',cursor:'pointer',fontSize:14,fontWeight:600}}>
+                Sim, deletar permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {/* Back bar */}
       <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:14}}>
@@ -62,6 +96,12 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
             navigator.clipboard?.writeText(msg).then(() => alert('Dados copiados para a área de transferência!'));
           }}><I.phone /> Contato</button>
           <button className="ghost-btn" onClick={() => setEditando(true)}><I.edit /> Editar</button>
+          <button className="ghost-btn" onClick={() => setConfirmDelete(true)}
+            style={{color:'var(--danger)', borderColor:'color-mix(in oklab,var(--danger) 40%,var(--border))'}}
+            onMouseEnter={e=>{e.currentTarget.style.background='color-mix(in oklab,var(--danger) 10%,transparent)'}}
+            onMouseLeave={e=>{e.currentTarget.style.background=''}}>
+            <I.trash style={{width:14,height:14}} /> Deletar
+          </button>
           <button className="primary-btn" onClick={() => onNewSessao?.(patientId)}><I.plus /> Agendar sessão</button>
         </div>
       </div>
