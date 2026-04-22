@@ -264,32 +264,71 @@ function PatientsViewWithToggle({ view, setView, onOpenPatient, showOnlyActive, 
 
 function TestCatalogView() {
   const { TEST_CATALOG } = window.CORTEX_DATA;
+  const [q, setQ] = React.useState('');
+  const [filtPop, setFiltPop] = React.useState('Todos');
+
+  const populacoes = ['Todos', 'Criança', 'Adolescente', 'Adulto', 'Idoso'];
+  const totalTestes = Object.values(TEST_CATALOG).reduce((s, arr) => s + arr.length, 0);
+
+  const filteredCatalog = Object.fromEntries(
+    Object.entries(TEST_CATALOG).map(([cat, tests]) => {
+      let filtered = tests;
+      if (filtPop !== 'Todos') filtered = filtered.filter(t => t.populacao?.includes(filtPop));
+      if (q.trim()) {
+        const ql = q.toLowerCase();
+        filtered = filtered.filter(t => t.name.toLowerCase().includes(ql) || t.avalia?.toLowerCase().includes(ql));
+      }
+      return [cat, filtered];
+    }).filter(([, tests]) => tests.length > 0)
+  );
+
   return (
     <div>
       <div className="section-head">
-        <h2>Catálogo de testes</h2>
-        <span className="sub">agrupados por função cognitiva — ajuste conforme a sua bateria</span>
-        <div className="right">
-          <button className="primary-btn"><I.plus /> Adicionar teste</button>
-        </div>
+        <h2>Catálogo de instrumentos</h2>
+        <span className="sub">{totalTestes} instrumentos · Equilibrium Neuropsicologia</span>
       </div>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap: 14}}>
-        {Object.entries(TEST_CATALOG).map(([cat, tests]) => (
+
+      {/* Filtros */}
+      <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:18, flexWrap:'wrap'}}>
+        <div className="topbar search" style={{background:'var(--surface)', margin:0, width:260}}>
+          <I.search style={{width:14, height:14, color:'var(--text-3)'}} />
+          <input placeholder="Buscar instrumento..." value={q} onChange={e=>setQ(e.target.value)} />
+        </div>
+        {populacoes.map(p => (
+          <button key={p} onClick={() => setFiltPop(p)}
+            className={"chip-filter" + (filtPop === p ? " active" : "")}>
+            {p}
+          </button>
+        ))}
+      </div>
+
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:14}}>
+        {Object.entries(filteredCatalog).map(([cat, tests]) => (
           <div className="card" key={cat}>
-            <h3 style={{marginBottom: 4}}>{cat}</h3>
-            <div className="sub" style={{marginBottom: 12}}>{tests.length} testes</div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
+              <h3 style={{margin:0, fontSize:14}}>{cat}</h3>
+              <span style={{fontSize:11, color:'var(--text-3)', fontWeight:600}}>{tests.length} instrumento{tests.length !== 1 ? 's':''}</span>
+            </div>
             {tests.map(t => (
-              <div key={t.id} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderTop:'1px dashed var(--border)'}}>
-                <I.flask style={{width:14,height:14, color:'var(--text-3)'}} />
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13.5, fontWeight:500}}>{t.name}</div>
+              <div key={t.id} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'9px 0', borderTop:'1px dashed var(--border)'}}>
+                <I.flask style={{width:13, height:13, color:'var(--teal-500)', marginTop:2, flexShrink:0}} />
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13.5, fontWeight:600, marginBottom:2}}>{t.name}</div>
+                  <div style={{fontSize:12, color:'var(--text-3)', lineHeight:1.4}}>{t.avalia}</div>
                 </div>
-                <span style={{fontFamily:'var(--font-mono)', fontSize:11.5, color:'var(--text-3)'}}>{t.duration}min</span>
+                <span style={{fontSize:11, color:'var(--text-3)', whiteSpace:'nowrap', fontFamily:'var(--font-mono)', paddingTop:2}}>{t.faixa}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
+      {Object.keys(filteredCatalog).length === 0 && (
+        <div style={{textAlign:'center', padding:40, color:'var(--text-3)'}}>
+          <I.flask style={{width:32, height:32, margin:'0 auto 12px'}} />
+          <div>Nenhum instrumento encontrado para este filtro.</div>
+        </div>
+      )}
     </div>
   );
 }
