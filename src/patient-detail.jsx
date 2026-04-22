@@ -450,18 +450,49 @@ function TabHipoteses({ pac }) {
 }
 
 // ---- Relatório escolar ----------------------------------------------
-function TabEscolar({ pac }) {
-  const r = pac.relatorioEscolar || {};
+function TabEscolar({ pac, onNewSessao }) {
+  const [r, setR] = React.useState(pac.relatorioEscolar || {});
+  const [showAnotacao, setShowAnotacao] = React.useState(false);
+  const [anotacao, setAnotacao] = React.useState(r.anotacao || '');
+  const [saving, setSaving] = React.useState(false);
+  const clinicaId = pac.clinica_id || window._clinicaId;
+
+  const solicitarEscola = () => {
+    const email = prompt('E-mail da escola para solicitar o relatório:');
+    if (!email) return;
+    const assunto = encodeURIComponent(`Relatório Escolar — ${pac.nome}`);
+    const corpo = encodeURIComponent(
+      `Prezada equipe escolar,\n\nSolicito relatório pedagógico referente ao(a) aluno(a) ${pac.nome} para fins de avaliação neuropsicológica.\n\nAgradecemos a colaboração.\n\nAtenciosamente,\nEquilíbrium Neuropsicologia`
+    );
+    window.open(`mailto:${email}?subject=${assunto}&body=${corpo}`);
+  };
+
+  const salvarAnotacao = async () => {
+    setSaving(true);
+    try {
+      const updated = { ...r, anotacao };
+      await window.CORTEX_SB.upsertRelatorioEscolar(pac.id, clinicaId, updated);
+      setR(updated);
+      const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+      if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].relatorioEscolar = updated;
+      setShowAnotacao(false);
+    } catch(e) { alert('Erro: ' + e.message); }
+    finally { setSaving(false); }
+  };
+
   if (!r.recebido) {
     return (
       <div className="card" style={{textAlign:'center', padding: 40}}>
         <I.school style={{width:32, height:32, color:'var(--text-3)', margin:'0 auto'}} />
         <h3 style={{marginTop:12}}>Relatório escolar não recebido</h3>
         <div className="sub" style={{marginTop:4}}>{r.resumo || 'Ainda não foi solicitado.'}</div>
-        <button className="primary-btn" style={{marginTop:14}}><I.mail /> Solicitar à escola</button>
+        <button className="primary-btn" style={{marginTop:14}} onClick={solicitarEscola}>
+          <I.mail /> Solicitar à escola
+        </button>
       </div>
     );
   }
+
   return (
     <div className="card">
       <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
@@ -470,12 +501,44 @@ function TabEscolar({ pac }) {
         <span style={{fontFamily:'var(--font-mono)', fontSize:12, color:'var(--text-3)', marginLeft:'auto'}}>{fmtDateBR(r.data)}</span>
       </div>
       <p style={{color:'var(--text-2)', lineHeight:1.55, margin:0}}>
-        {r.resumo || `A coordenação de ${pac.escola} enviou relatório detalhado apontando os principais pontos de atenção pedagógica observados em sala. Foram destacadas oscilações no desempenho em atividades de leitura e interpretação, além de dificuldade em sustentar a atenção durante tarefas mais longas. A equipe escolar sinaliza disponibilidade para colaborar com adaptações após o laudo.`}
+        {r.resumo || `A coordenação de ${pac.escola} enviou relatório pedagógico.`}
       </p>
+      {r.anotacao && (
+        <div style={{marginTop:12, padding:'10px 14px', borderRadius:8, background:'var(--surface-2)', border:'1px solid var(--border)', fontSize:13, color:'var(--text-2)', lineHeight:1.55}}>
+          <strong style={{fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)'}}>Anotação clínica</strong>
+          <p style={{margin:'6px 0 0'}}>{r.anotacao}</p>
+        </div>
+      )}
       <div style={{marginTop:14, display:'flex', gap:8}}>
-        <button className="ghost-btn"><I.file /> Abrir PDF original</button>
-        <button className="ghost-btn"><I.edit /> Adicionar anotação</button>
+        {r.arquivo_url && (
+          <button className="ghost-btn" onClick={() => window.open(r.arquivo_url, '_blank')}>
+            <I.file /> Abrir PDF original
+          </button>
+        )}
+        <button className="ghost-btn" onClick={() => setShowAnotacao(true)}>
+          <I.edit /> {r.anotacao ? 'Editar anotação' : 'Adicionar anotação'}
+        </button>
       </div>
+
+      {showAnotacao && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={() => setShowAnotacao(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+              <h3 style={{margin:0}}>Anotação clínica</h3>
+              <button onClick={() => setShowAnotacao(false)} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+            </div>
+            <textarea value={anotacao} onChange={e => setAnotacao(e.target.value)} rows={6}
+              placeholder="Observações clínicas sobre o relatório escolar..."
+              style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,resize:'vertical',outline:'none',marginBottom:16}} />
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button onClick={() => setShowAnotacao(false)} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={salvarAnotacao} disabled={saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+                {saving ? 'Salvando...' : '✓ Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
