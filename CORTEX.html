@@ -458,8 +458,11 @@ function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
     if (!form.nome.trim()) { setErr('Nome obrigatório'); return; }
     setSaving(true); setErr('');
     try {
+      const dadosPac = { ...form };
+      if (!dadosPac.data_nasc)      dadosPac.data_nasc      = null;
+      if (!dadosPac.previsao_laudo) dadosPac.previsao_laudo = null;
       const pac = await window.CORTEX_SB.createPaciente({
-        ...form,
+        ...dadosPac,
         inicio: new Date().toISOString().slice(0,10),
         estagio: 'anamnese', progresso: 0, ativo: true,
       }, profile.clinica_id, user.id);

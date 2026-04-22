@@ -825,6 +825,9 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
     try {
       const patch = { ...form };
       if (fotoUrl !== (pac.avatar_url || null)) patch.avatar_url = fotoUrl;
+      // Limpar campos de data vazios — Supabase não aceita string vazia em campos date
+      if (!patch.data_nasc)      patch.data_nasc      = null;
+      if (!patch.previsao_laudo) patch.previsao_laudo = null;
       await window.CORTEX_SB.updatePaciente(pac.id, patch);
       // Atualizar localmente
       const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
