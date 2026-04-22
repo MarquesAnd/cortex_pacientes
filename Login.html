@@ -303,6 +303,8 @@
     body { grid-template-columns: 1fr; }
     .visual { display: none; }
   }
+  body { opacity: 0; transition: opacity 0.15s; }
+  body.ready { opacity: 1; }
 </style>
   <script src="src/supabase.js"></script>
 </head>
@@ -421,9 +423,19 @@
     setTimeout(() => form.classList.remove('shake'), 500);
   }
 
-  // Checar se já está logado
-  const existing = window.CORTEX_SB?.sbSession?.();
-  if (existing?.access_token) { window.location.href = 'CORTEX.html'; }
+  // Checar sessão de forma síncrona e mostrar body adequadamente
+  (function() {
+    try {
+      var sess = JSON.parse(localStorage.getItem('cortex.session') || 'null');
+      if (sess?.access_token) {
+        // Tem sessão — redirecionar sem mostrar login
+        window.location.replace('CORTEX.html');
+        return;
+      }
+    } catch(e) {}
+    // Sem sessão — mostrar tela de login
+    document.body.classList.add('ready');
+  })();
 
   // Toggle login/cadastro
   let isSignup = false;
