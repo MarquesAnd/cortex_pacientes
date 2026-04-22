@@ -36,12 +36,26 @@ function Dashboard({ onOpenPatient, onGoTo }) {
   });
   const attn = attnItems.slice(0, 6);
 
-  // Alertas — combinados
+  // Alertas — 100% dinâmicos baseados nos pacientes reais
   const alerts = [];
-  attnItems.filter(a => a.type === 'laudo').slice(0, 2).forEach(a => alerts.push({ critical: true, title: `Laudo em atraso — ${a.pac.nome.split(' ')[0]}`, sub: `Previsão era ${fmtDateBR(a.pac.previsaoLaudo)}.` }));
+  // Laudos em atraso
+  attnItems.filter(a => a.type === 'laudo').slice(0, 3).forEach(a =>
+    alerts.push({ critical: true, title: `Laudo em atraso — ${a.pac.nome.split(' ')[0]}`, sub: `Previsão era ${fmtDateBR(a.pac.previsaoLaudo)}.` })
+  );
+  // Correções paradas
   const correcaoPendente = attnItems.filter(a => a.type === 'correcao').length;
   if (correcaoPendente) alerts.push({ critical: false, title: `${correcaoPendente} teste(s) aguardando correção`, sub: `Há mais de 7 dias parados.` });
-  alerts.push({ critical: false, title: `Relatório escolar pendente`, sub: `Joaquim Pessanha — solicitado 12/04.` });
+  // Testes atrasados
+  const testesAtrasados = attnItems.filter(a => a.type === 'teste').length;
+  if (testesAtrasados) alerts.push({ critical: false, title: `${testesAtrasados} instrumento(s) com data vencida`, sub: `Verifique a bateria dos pacientes afetados.` });
+  // Relatórios escolares pendentes (pacientes sem relatorio e em etapa >= testes)
+  const semRelatorio = activePatients.filter(p =>
+    !p.relatorioEscolar?.recebido &&
+    ['testes','correcao','laudo'].includes(p.estagio)
+  );
+  semRelatorio.slice(0, 2).forEach(p =>
+    alerts.push({ critical: false, title: `Relatório escolar não recebido`, sub: `${p.nome.split(' ')[0]} ${p.nome.split(' ')[1] || ''} — na etapa ${stageLabel(p.estagio)}.` })
+  );
 
   return (
     <div>
@@ -51,7 +65,7 @@ function Dashboard({ onOpenPatient, onGoTo }) {
           <div className="ico"><I.users /></div>
           <div className="label">Pacientes ativos</div>
           <div className="value">{activePatients.length}</div>
-          <div className="delta up"><I.trend style={{width:12, height:12}} /> +2 este mês</div>
+          <div className="delta up"><I.trend style={{width:12, height:12}} /> {activePatients.length > 0 ? `${activePatients.length} ativos` : "Nenhum ainda"}</div>
         </div>
         <div className="kpi">
           <div className="ico"><I.clock /></div>

@@ -94,6 +94,8 @@ function App() {
           convenios: clinica.convenios || [],
           etapas: clinica.etapas_fluxo || [],
         }));
+        // Disparar evento para que GeralTab recarregue se estiver aberta
+        window.dispatchEvent(new CustomEvent('cortex-config-updated', { detail: clinica }));
       }
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
     } catch (e) { console.warn('hydratePacientes', e); }
