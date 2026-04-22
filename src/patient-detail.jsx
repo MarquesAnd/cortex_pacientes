@@ -29,9 +29,12 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
 
       {/* Header */}
       <div className="pd-header">
-        <div className={`pavatar-lg ${pac.corAvatar}`} style={{background:`linear-gradient(135deg, var(--${pac.corAvatar}-400, var(--accent)), var(--${pac.corAvatar}-500, var(--accent)))`}}>
+        <div className={`pavatar-lg ${pac.corAvatar || 'violet'}`} style={{background:`linear-gradient(135deg, var(--${pac.corAvatar || 'violet'}-400, var(--accent)), var(--${pac.corAvatar || 'violet'}-500, var(--accent)))`}}>
           <div style={{position:'absolute', inset:0, display:'grid', placeItems:'center', fontSize:22, fontWeight:600, color:'white'}}>{initials(pac.nome)}</div>
-          <img src={avatarUrl(pac)} alt={pac.nome} style={{position:'relative', zIndex:1}} />
+          {pac.avatar_url
+            ? <img src={pac.avatar_url} alt={pac.nome} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'inherit',zIndex:1}} />
+            : <img src={avatarUrl(pac)} alt={pac.nome} style={{position:'relative', zIndex:1}} />
+          }
         </div>
         <div style={{flex:1, minWidth: 0}}>
           <h1>{pac.nome}</h1>
@@ -400,6 +403,7 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
     previsao_laudo: pac.previsaoLaudo || '',
     ativo: pac.ativo !== false,
   });
+  const [fotoUrl, setFotoUrl] = React.useState(pac.avatar_url || null);
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState('');
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
@@ -408,7 +412,9 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true); setErr('');
     try {
-      await window.CORTEX_SB.updatePaciente(pac.id, form);
+      const patch = { ...form };
+      if (fotoUrl !== (pac.avatar_url || null)) patch.avatar_url = fotoUrl;
+      await window.CORTEX_SB.updatePaciente(pac.id, patch);
       // Atualizar localmente
       const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
       if (idx >= 0) {
@@ -420,6 +426,7 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
           encaminhadoPor: form.encaminhado_por, queixa: form.queixa,
           estagio: form.estagio, progresso: +form.progresso,
           previsaoLaudo: form.previsao_laudo, ativo: form.ativo,
+          avatar_url: fotoUrl,
         };
       }
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
@@ -441,6 +448,13 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h2 style={{margin:0,fontSize:18}}>Editar paciente</h2>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{display:'flex',gap:20,alignItems:'flex-start',marginBottom:20}}>
+          <FotoUpload src={fotoUrl} onFile={setFotoUrl} size={80} shape="square" label="Foto do paciente" />
+          <div style={{flex:1, color:'var(--text-2)', fontSize:13, lineHeight:1.6}}>
+            <div style={{fontWeight:600, fontSize:14, marginBottom:4}}>{form.nome || 'Novo paciente'}</div>
+            <div>{form.tipo} · {form.convenio || 'Convênio não definido'}</div>
+          </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
           <div style={{gridColumn:'span 2'}}><label style={lbl}>Nome completo</label><input value={form.nome} onChange={e=>set('nome',e.target.value)} style={inp} required /></div>

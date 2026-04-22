@@ -82,16 +82,19 @@ function avatarUrl(paciente) {
 function PAvatar({ paciente, size = '', showPhoto = true }) {
   const [loaded, setLoaded] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
+  // Usar foto real se existir, senão DiceBear
+  const src = paciente.avatar_url || avatarUrl(paciente);
   return (
-    <div className={`pavatar ${size} ${paciente.corAvatar}`}>
+    <div className={`pavatar ${size} ${paciente.corAvatar || 'violet'}`}>
       <div className="initials-bg">{initials(paciente.nome)}</div>
       {showPhoto && !failed && (
         <img
-          src={avatarUrl(paciente)}
+          src={src}
           alt={paciente.nome}
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
-          style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
+          style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s',
+            width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }}
           loading="lazy"
         />
       )}
@@ -116,8 +119,81 @@ function StagePill({ stage }) {
 }
 
 // Expose to window for other modules
+// Helper: converte File/Blob para base64 redimensionado
+async function fileToBase64(file, maxPx = 400) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Componente de upload de foto reutilizável
+function FotoUpload({ src, onFile, size = 80, shape = 'round', label = 'Trocar foto' }) {
+  const inputRef = React.useRef();
+  const borderR = shape === 'round' ? '50%' : 12;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+      <div style={{ position:'relative', width:size, height:size, cursor:'pointer' }}
+           onClick={() => inputRef.current?.click()}>
+        <div style={{
+          width:size, height:size, borderRadius:borderR,
+          background:'var(--surface-2)', border:'2px solid var(--border)',
+          overflow:'hidden', display:'grid', placeItems:'center',
+        }}>
+          {src
+            ? <img src={src} alt="foto" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+            : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)"
+                strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+          }
+        </div>
+        {/* Overlay câmera */}
+        <div style={{
+          position:'absolute', bottom:0, right:0,
+          width: Math.round(size * 0.35), height: Math.round(size * 0.35),
+          borderRadius:'50%', background:'var(--teal-500)',
+          display:'grid', placeItems:'center',
+          border:'2px solid var(--surface)',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white"
+              strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+      </div>
+      <span style={{fontSize:11, color:'var(--text-3)', cursor:'pointer'}}
+            onClick={() => inputRef.current?.click()}>{label}</span>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:'none'}}
+             onChange={async (e) => {
+               const file = e.target.files?.[0];
+               if (!file) return;
+               try { onFile(await fileToBase64(file)); }
+               catch(err) { console.error('foto upload:', err); }
+               e.target.value = '';
+             }} />
+    </div>
+  );
+}
+
 Object.assign(window, {
-  I, PAvatar, Progress, StagePill, avatarUrl,
+  I, PAvatar, Progress, StagePill, avatarUrl, FotoUpload, fileToBase64,
   initials, fmtDateBR, fmtDateLong, daysBetween,
   stageIndex, stageColor, stageLabel, findTest, isTestOverdue,
 });

@@ -180,8 +180,12 @@ function App() {
             <div className="avatar" style={{
               background: 'linear-gradient(135deg, var(--teal-500), var(--pink-500))',
               display:'grid', placeItems:'center', color:'white', fontWeight:700, fontSize:13,
+              overflow:'hidden', padding:0,
             }}>
-              {(profile?.nome || user?.email || 'U').slice(0,2).toUpperCase()}
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="foto" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                : (profile?.nome || user?.email || 'U').slice(0,2).toUpperCase()
+              }
             </div>
             <div className="meta">
               <strong>{profile?.nome || user?.email?.split('@')[0] || 'Usuário'}</strong><br/>
@@ -359,6 +363,7 @@ function rowToPaciente(r) {
     previsaoLaudo: r.previsao_laudo,
     ativo: r.ativo !== false,
     corAvatar: r.cor_avatar || 'violet',
+    avatar_url: r.avatar_url || null,
     criadoEm: r.created_at?.slice(0,10),
     diasNaEtapa: 0,
     testes: [], sessoes: [], hipoteses: [],
@@ -587,8 +592,8 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
       especialidade: profile?.especialidade || '',
       crm: profile?.crm || '',
       telefone: profile?.telefone || '',
-      clinica_nome: '',
     });
+    const [fotoUrl, setFotoUrl] = React.useState(profile?.avatar_url || null);
     const [saving, setSaving] = React.useState(false);
     const [msg, setMsg] = React.useState('');
     const set = (k, v) => setForm(f => ({...f, [k]: v}));
@@ -596,11 +601,10 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
     const save = async () => {
       setSaving(true); setMsg('');
       try {
-        await SB.cortexUpdateProfile(user.id, {
-          nome: form.nome,
-          especialidade: form.especialidade,
-        });
-        onProfileUpdate?.({ ...profile, nome: form.nome, especialidade: form.especialidade });
+        const patch = { nome: form.nome, especialidade: form.especialidade };
+        if (fotoUrl !== (profile?.avatar_url || null)) patch.avatar_url = fotoUrl;
+        await SB.cortexUpdateProfile(user.id, patch);
+        onProfileUpdate?.({ ...profile, ...patch });
         setMsg('✓ Perfil salvo!');
         setTimeout(() => setMsg(''), 3000);
       } catch(e) { setMsg('⚠ ' + e.message); }
@@ -611,28 +615,31 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
     const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:6};
 
     return (
-      <div style={{maxWidth:580}}>
-        <h3 style={{marginBottom:20, fontSize:16}}>Meu perfil</h3>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16}}>
-          <div style={{gridColumn:'span 2'}}>
-            <label style={lbl}>Nome completo</label>
-            <input value={form.nome} onChange={e=>set('nome',e.target.value)} style={inp} placeholder="Dra. Wessilon Marques" />
-          </div>
-          <div>
-            <label style={lbl}>E-mail</label>
-            <input value={form.email} disabled style={{...inp, opacity:0.6}} />
-          </div>
-          <div>
-            <label style={lbl}>Especialidade</label>
-            <input value={form.especialidade} onChange={e=>set('especialidade',e.target.value)} style={inp} placeholder="Neuropsicóloga" />
-          </div>
-          <div>
-            <label style={lbl}>CRP / CRM</label>
-            <input value={form.crm} onChange={e=>set('crm',e.target.value)} style={inp} placeholder="04/00000" />
-          </div>
-          <div>
-            <label style={lbl}>Telefone / WhatsApp</label>
-            <input value={form.telefone} onChange={e=>set('telefone',e.target.value)} style={inp} placeholder="(34) 99999-9999" />
+      <div style={{maxWidth:600}}>
+        <h3 style={{marginBottom:24, fontSize:16}}>Meu perfil</h3>
+        <div style={{display:'flex', gap:32, alignItems:'flex-start', marginBottom:24}}>
+          <FotoUpload src={fotoUrl} onFile={setFotoUrl} size={96} shape="round" label="Trocar foto" />
+          <div style={{flex:1, display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
+            <div style={{gridColumn:'span 2'}}>
+              <label style={lbl}>Nome completo</label>
+              <input value={form.nome} onChange={e=>set('nome',e.target.value)} style={inp} placeholder="Dra. Wessilon Marques" />
+            </div>
+            <div>
+              <label style={lbl}>E-mail</label>
+              <input value={form.email} disabled style={{...inp, opacity:0.5}} />
+            </div>
+            <div>
+              <label style={lbl}>Especialidade</label>
+              <input value={form.especialidade} onChange={e=>set('especialidade',e.target.value)} style={inp} placeholder="Neuropsicóloga" />
+            </div>
+            <div>
+              <label style={lbl}>CRP / CRM</label>
+              <input value={form.crm} onChange={e=>set('crm',e.target.value)} style={inp} placeholder="04/00000" />
+            </div>
+            <div>
+              <label style={lbl}>Telefone / WhatsApp</label>
+              <input value={form.telefone} onChange={e=>set('telefone',e.target.value)} style={inp} placeholder="(34) 99999-9999" />
+            </div>
           </div>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:14}}>
@@ -644,7 +651,6 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
       </div>
     );
   };
-
   // ── Aba Geral ───────────────────────────────────────────────
   const GeralTab = () => {
     // Convênios
