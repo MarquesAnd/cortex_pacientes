@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>CORTEX — Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles.css" />
+<link rel="stylesheet" href="src/polish.css" />
+<style>
+  html, body { height: 100%; }
+  body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  body::before { display: none; }
+
+  /* Left: visual panel */
+  .visual {
+    position: relative;
+    background: linear-gradient(160deg,
+      oklch(0.22 0.04 160) 0%,
+      oklch(0.30 0.07 180) 35%,
+      oklch(0.40 0.12 10) 100%);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    padding: 44px;
+    color: white;
+  }
+  .visual::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.12) 1px, transparent 0);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(ellipse at 40% 60%, #000 20%, transparent 80%);
+    pointer-events: none;
+  }
+  .glow-1, .glow-2 {
+    position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none;
+  }
+  .glow-1 {
+    width: 480px; height: 480px;
+    background: oklch(0.72 0.18 155 / 0.55);
+    left: -120px; top: -80px;
+    animation: float-a 14s ease-in-out infinite;
+  }
+  .glow-2 {
+    width: 520px; height: 520px;
+    background: oklch(0.72 0.22 0 / 0.50);
+    right: -140px; bottom: -100px;
+    animation: float-b 18s ease-in-out infinite;
+  }
+  @keyframes float-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(60px, 40px) scale(1.08); }
+  }
+  @keyframes float-b {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-80px, -30px) scale(1.05); }
+  }
+
+  .visual .brand {
+    display: flex; align-items: center; gap: 12px;
+    position: relative; z-index: 2;
+  }
+  .visual .brand-mark {
+    width: 46px; height: 46px; border-radius: 12px;
+    overflow: hidden; background: white;
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,0.5);
+  }
+  .visual .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .visual .brand strong { font-size: 22px; letter-spacing: -0.01em; font-weight: 700; }
+  .visual .brand span { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; display: block; }
+
+  /* Interactive canvas fills the visual panel */
+  #trailCanvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .visual { cursor: crosshair; }
+
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.04); }
+  }
+
+  .tagline {
+    position: relative; z-index: 2; margin-top: auto;
+    max-width: 440px;
+  }
+  .tagline h2 {
+    font-size: 28px; line-height: 1.15; letter-spacing: -0.02em;
+    font-weight: 600; margin: 0 0 12px;
+  }
+  .tagline p {
+    font-size: 14px; line-height: 1.55; opacity: 0.80; margin: 0;
+  }
+  .meta-strip {
+    position: relative; z-index: 2; margin-top: 30px;
+    display: flex; gap: 26px; flex-wrap: wrap;
+  }
+  .meta-strip .item .n {
+    font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-strip .item .l {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    opacity: 0.65; margin-top: 4px;
+  }
+
+  /* Right: form panel */
+  .form-panel {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+    position: relative;
+    background-image: radial-gradient(circle at 1px 1px, var(--border-strong) 1px, transparent 0);
+    background-size: 28px 28px;
+    background-position: -14px -14px;
+  }
+  .form-card {
+    width: 100%; max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 36px 32px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+    animation: pop-in 0.5s cubic-bezier(.2,1.3,.4,1);
+  }
+  .form-card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, var(--teal-500), var(--pink-500));
+  }
+  .form-card h1 {
+    margin: 0 0 6px; font-size: 22px; letter-spacing: -0.015em; font-weight: 600;
+  }
+  .form-card .sub {
+    color: var(--text-3); font-size: 13.5px; margin-bottom: 26px;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block; font-size: 11.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .field-input {
+    position: relative;
+    display: flex; align-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 12px;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+  .field-input:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent);
+    background: var(--surface);
+  }
+  .field-input svg {
+    width: 16px; height: 16px; color: var(--text-3);
+    stroke-width: 1.8; flex: none;
+  }
+  .field-input:focus-within svg { color: var(--accent); }
+  .field-input input {
+    flex: 1; border: 0; background: transparent; outline: none;
+    padding: 12px 10px; font: inherit; font-size: 14px; color: var(--text);
+  }
+  .field-input input::placeholder { color: var(--text-3); }
+  .toggle-eye {
+    background: transparent; border: 0; padding: 4px; cursor: pointer;
+    color: var(--text-3); display: grid; place-items: center;
+  }
+  .toggle-eye:hover { color: var(--text); }
+
+  .row-between {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 6px 0 20px;
+  }
+  .checkbox {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    color: var(--text-2); cursor: pointer; user-select: none;
+  }
+  .checkbox .box {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    display: grid; place-items: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .checkbox input { display: none; }
+  .checkbox.on .box {
+    background: var(--accent); border-color: var(--accent);
+    color: white;
+  }
+  .checkbox svg { width: 11px; height: 11px; stroke-width: 3; opacity: 0; transition: opacity 0.15s; }
+  .checkbox.on svg { opacity: 1; }
+  .forgot {
+    font-size: 13px; color: var(--accent); font-weight: 500; text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .forgot:hover { opacity: 0.75; text-decoration: underline; }
+
+  .login-btn {
+    width: 100%; justify-content: center;
+    padding: 13px 14px; font-size: 14px;
+    background: linear-gradient(135deg, var(--teal-500), var(--pink-500));
+    border-radius: 10px;
+    border: 0; color: white; font-weight: 600;
+    cursor: pointer;
+    position: relative; overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 10px 22px -10px var(--accent);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .login-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px var(--pink-500); }
+  .login-btn:active { transform: translateY(0) scale(0.98); }
+  .login-btn::after {
+    content: ""; position: absolute; top: 0; left: -120%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+    transform: skewX(-20deg); transition: left 0.6s;
+  }
+  .login-btn:hover::after { left: 130%; }
+
+  .divider {
+    text-align: center; color: var(--text-3); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+    margin: 20px 0 14px;
+    position: relative;
+  }
+  .divider::before, .divider::after {
+    content: ""; position: absolute; top: 50%; width: calc(50% - 28px);
+    height: 1px; background: var(--border);
+  }
+  .divider::before { left: 0; }
+  .divider::after  { right: 0; }
+
+  .oauth {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .oauth button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-2); font-weight: 500; font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  }
+  .oauth button:hover { transform: translateY(-1px); border-color: var(--accent); background: var(--surface); color: var(--text); }
+  .oauth svg { width: 16px; height: 16px; }
+
+  .foot {
+    margin-top: 24px; text-align: center; font-size: 13px; color: var(--text-3);
+  }
+  .foot a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .foot a:hover { text-decoration: underline; }
+
+  .theme-toggle {
+    position: absolute; top: 20px; right: 20px;
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--text-2);
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .theme-toggle:hover { transform: rotate(-12deg); border-color: var(--accent); color: var(--accent); }
+  .theme-toggle svg { width: 16px; height: 16px; }
+
+  /* Shake on error */
+  .shake { animation: shake 0.45s; }
+  @keyframes shake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-6px); }
+    40%, 60% { transform: translateX(6px); }
+  }
+
+  .error-msg {
+    background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--border));
+    color: var(--danger);
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 12.5px; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
+    .visual { display: none; }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- LEFT: interactive visual panel -->
+<section class="visual">
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <canvas id="trailCanvas"></canvas>
+</section>
+
+<!-- RIGHT: form panel -->
+<section class="form-panel">
+  <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+
+  <form class="form-card" id="loginForm" autocomplete="on">
+    <h1>Bem-vinda de volta</h1>
+    <div class="sub">Entre com suas credenciais para continuar.</div>
+
+    <div id="errorBox"></div>
+
+    <div class="field">
+      <label for="email">E-mail</label>
+      <div class="field-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <input id="email" type="email" placeholder="voce@clinica.com.br" autocomplete="email" required />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="password">Senha</label>
+      <div class="field-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+        <button type="button" class="toggle-eye" id="eye" aria-label="Mostrar senha">
+          <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="row-between">
+      <label class="checkbox on" id="remember">
+        <input type="checkbox" checked />
+        <span class="box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        Lembrar de mim
+      </label>
+      <a class="forgot" href="#">Esqueci minha senha</a>
+    </div>
+
+    <button class="login-btn" type="submit">
+      Entrar
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+
+    <div class="divider">ou continue com</div>
+    <div class="oauth">
+      <button type="button">
+        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C4 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09A6.96 6.96 0 0 1 5.5 12c0-.72.13-1.43.34-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.77.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 4 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
+        Google
+      </button>
+      <button type="button">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 1.5c-1.08-.05-2.37.6-3.12 1.4-.67.73-1.25 1.87-1.03 2.95 1.17.08 2.35-.58 3.03-1.4.65-.78 1.18-1.9 1.12-2.95zM17 8.5c-1.5-.1-2.9.9-3.6.9-.75 0-2-.85-3.25-.82-1.7.03-3.25 1-4.1 2.53-1.73 3.03-.44 7.5 1.24 9.97.83 1.2 1.8 2.54 3.08 2.5 1.23-.05 1.7-.8 3.2-.8 1.5 0 1.9.8 3.23.77 1.33-.02 2.17-1.22 2.98-2.43.63-.9 1.12-1.88 1.45-2.92-3.8-1.45-3.98-7.22-.22-8.78-1.07-1.54-2.73-2.88-4-2.92z"/></svg>
+        Apple
+      </button>
+    </div>
+
+    <div class="foot">
+      Não tem conta? <a href="#">Solicitar acesso</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  // Theme toggle
+  const body = document.body;
+  const savedTheme = localStorage.getItem('cortex.loginTheme');
+  if (savedTheme) body.setAttribute('data-theme', savedTheme);
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const cur = body.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    body.setAttribute('data-theme', next);
+    localStorage.setItem('cortex.loginTheme', next);
+  });
+
+  // Password toggle
+  const pass = document.getElementById('password');
+  const eye = document.getElementById('eye');
+  eye.addEventListener('click', () => {
+    pass.type = pass.type === 'password' ? 'text' : 'password';
+  });
+
+  // Remember toggle
+  const rem = document.getElementById('remember');
+  const remCb = rem.querySelector('input');
+  rem.addEventListener('click', (e) => {
+    e.preventDefault();
+    remCb.checked = !remCb.checked;
+    rem.classList.toggle('on', remCb.checked);
+  });
+
+  // Form submit
+  const form = document.getElementById('loginForm');
+  const errBox = document.getElementById('errorBox');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    errBox.innerHTML = '';
+    const email = document.getElementById('email').value.trim();
+    const pw = pass.value;
+    if (!email.includes('@') || pw.length < 4) {
+      form.classList.add('shake');
+      errBox.innerHTML = `<div class="error-msg">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Verifique seu e-mail e senha (mín. 4 caracteres).
+      </div>`;
+      setTimeout(() => form.classList.remove('shake'), 500);
+      return;
+    }
+    // "Entrando..." and redirect
+    const btn = form.querySelector('.login-btn');
+    btn.innerHTML = 'Entrando...';
+    btn.disabled = true;
+    setTimeout(() => { window.location.href = 'CORTEX.html'; }, 700);
+  });
+
+  // Interactive neural trail on the visual panel
+  (function initTrail() {
+    const canvas = document.getElementById('trailCanvas');
+    if (!canvas) return;
+    const visual = document.querySelector('.visual');
+    const ctx = canvas.getContext('2d');
+    let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resize() {
+      const r = visual.getBoundingClientRect();
+      W = r.width; H = r.height;
+      canvas.width = W * DPR;
+      canvas.height = H * DPR;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Particle trail
+    const particles = [];
+    const MAX = 260;
+    let lastX = null, lastY = null, lastT = 0;
+    let idle = true;
+
+    function addParticle(x, y, vx, vy) {
+      particles.push({
+        x, y, vx, vy,
+        life: 1,
+        size: 2 + Math.random() * 3,
+        hue: Math.random() < 0.5 ? 155 : 0,   // green or rose
+        wob: Math.random() * Math.PI * 2,
+      });
+      if (particles.length > MAX) particles.splice(0, particles.length - MAX);
+    }
+
+    visual.addEventListener('mousemove', (e) => {
+      const r = visual.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const now = performance.now();
+      idle = false;
+
+      if (lastX !== null) {
+        const dx = x - lastX, dy = y - lastY;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.min(14, Math.max(1, Math.floor(dist / 6)));
+        for (let i = 0; i < steps; i++) {
+          const t = i / steps;
+          const px = lastX + dx * t;
+          const py = lastY + dy * t;
+          // perpendicular spread
+          const speed = 0.15 + Math.random() * 0.35;
+          const ang = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+          addParticle(px, py, Math.cos(ang) * speed, Math.sin(ang) * speed);
+        }
+      } else {
+        addParticle(x, y, 0, 0);
+      }
+      lastX = x; lastY = y; lastT = now;
+    });
+
+    visual.addEventListener('mouseleave', () => {
+      lastX = lastY = null; idle = true;
+    });
+
+    visual.addEventListener('click', (e) => {
+      const r = visual.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      // burst
+      for (let i = 0; i < 40; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const sp = 0.8 + Math.random() * 2.4;
+        addParticle(x, y, Math.cos(ang) * sp, Math.sin(ang) * sp);
+      }
+    });
+
+    function draw() {
+      // fade previous frame -> long trail
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.985;
+        p.vy *= 0.985;
+        p.wob += 0.08;
+        p.life -= 0.012;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const alpha = Math.max(0, p.life);
+        const radius = p.size * (0.7 + Math.sin(p.wob) * 0.3);
+
+        // outer glow
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 6);
+        grad.addColorStop(0, `oklch(0.80 0.22 ${p.hue} / ${alpha * 0.9})`);
+        grad.addColorStop(0.4, `oklch(0.65 0.18 ${p.hue} / ${alpha * 0.35})`);
+        grad.addColorStop(1, `oklch(0.50 0.12 ${p.hue} / 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // bright core
+        ctx.fillStyle = `oklch(0.95 0.08 ${p.hue} / ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // connect close neighbors with thin lines (neural effect)
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineWidth = 0.6;
+      const LINK = 70;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i], b = particles[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const d = Math.hypot(dx, dy);
+          if (d < LINK) {
+            const al = (1 - d / LINK) * 0.35 * Math.min(a.life, b.life);
+            const hue = (a.hue + b.hue) / 2;
+            ctx.strokeStyle = `oklch(0.80 0.16 ${hue} / ${al})`;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
+</script>
+</body>
+</html>

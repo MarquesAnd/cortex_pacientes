@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>CORTEX — Acompanhamento de Pacientes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles.css" />
+<link rel="stylesheet" href="src/polish.css" />
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="src/data.js"></script>
+<script type="text/babel" src="src/ui.jsx"></script>
+<script type="text/babel" src="src/dashboard.jsx"></script>
+<script type="text/babel" src="src/patients.jsx"></script>
+<script type="text/babel" src="src/agenda.jsx"></script>
+<script type="text/babel" src="src/patient-detail.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "mainView": "dashboard",
+  "density": "confortavel",
+  "onlyActive": true
+}/*EDITMODE-END*/;
+
+function App() {
+  // Load persisted
+  const stored = (() => { try { return JSON.parse(localStorage.getItem('cortex.state') || '{}'); } catch { return {}; } })();
+  const [theme, setTheme] = React.useState(stored.theme || TWEAK_DEFAULTS.theme);
+  const [density, setDensity] = React.useState(stored.density || TWEAK_DEFAULTS.density);
+  const [onlyActive, setOnlyActive] = React.useState(stored.onlyActive ?? TWEAK_DEFAULTS.onlyActive);
+  const [page, setPage] = React.useState(stored.page || 'dashboard');
+  const [patientsView, setPatientsView] = React.useState(stored.patientsView || 'kanban');
+  const [selectedPatient, setSelectedPatient] = React.useState(stored.selectedPatient || null);
+  const [editMode, setEditMode] = React.useState(false);
+
+  // Persist
+  React.useEffect(() => {
+    localStorage.setItem('cortex.state', JSON.stringify({ theme, density, onlyActive, page, patientsView, selectedPatient }));
+  }, [theme, density, onlyActive, page, patientsView, selectedPatient]);
+
+  // Theme apply
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-density', density === 'compact' ? 'compact' : 'confortavel');
+  }, [theme, density]);
+
+  // Tweaks message listener
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setEditMode(true);
+      if (e.data?.type === '__deactivate_edit_mode') setEditMode(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const { PATIENTS } = window.CORTEX_DATA;
+  const activeCount = PATIENTS.filter(p => p.ativo).length;
+
+  const openPatient = (id) => { setSelectedPatient(id); setPage('patient'); };
+  const backToList = () => { setSelectedPatient(null); setPage('pacientes'); };
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <I.dash />, count: null },
+    { id: 'pacientes', label: 'Pacientes', icon: <I.users />, count: activeCount },
+    { id: 'agenda',    label: 'Agenda',    icon: <I.cal />,   count: null },
+    { id: 'testes',    label: 'Catálogo de testes', icon: <I.flask />, count: null },
+  ];
+
+  const crumb = page === 'patient' ? (PATIENTS.find(p => p.id === selectedPatient)?.nome || '') : null;
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark"><img src="assets/cortex-logo.png" alt="CORTEX" /></div>
+          <div className="brand-text">
+            <strong>CORTEX</strong>
+            <span>Neuropsicologia</span>
+          </div>
+        </div>
+
+        <div className="nav-section-label">Navegação</div>
+        {navItems.map(n => (
+          <div key={n.id} className={"nav-item" + (page === n.id || (n.id === 'pacientes' && page === 'patient') ? ' active' : '')}
+               onClick={() => { setPage(n.id); if (n.id !== 'patient') setSelectedPatient(null); }}>
+            {n.icon}
+            <span>{n.label}</span>
+            {n.count !== null && <span className="count">{n.count}</span>}
+          </div>
+        ))}
+
+        <div className="nav-section-label" style={{marginTop: 8}}>Atalhos</div>
+        <div className="nav-item"><I.plus /> <span>Novo paciente</span></div>
+        <div className="nav-item"><I.bell /> <span>Alertas</span><span className="count" style={{color:'var(--danger)'}}>3</span></div>
+
+        <div className="sidebar-footer">
+          <div className="user-card">
+            <div className="avatar">DR</div>
+            <div className="meta">
+              <strong>Dra. usuária</strong><br/>
+              <span>Neuropsicóloga</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Content */}
+      <div className="content">
+        <header className="topbar">
+          <div className="crumbs">
+            {page !== 'patient' ? <b>{(navItems.find(n => n.id === page) || {label:'Dashboard'}).label}</b> : <>Pacientes / <b>{crumb}</b></>}
+          </div>
+          <div className="search">
+            <I.search style={{width:14,height:14, color:'var(--text-3)'}} />
+            <input placeholder="Buscar paciente, teste, sessão..." />
+            <span className="kbd">⌘K</span>
+          </div>
+          <button className="icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Tema">
+            {theme === 'dark' ? <I.sun /> : <I.moon />}
+          </button>
+          <button className="icon-btn" title="Notificações"><I.bell /></button>
+          <button className="primary-btn"><I.plus /> Sessão</button>
+        </header>
+
+        <main className="scroll-area">
+          {page === 'dashboard' && <Dashboard onOpenPatient={openPatient} onGoTo={setPage} />}
+          {page === 'pacientes' && (
+            <>
+              <PatientsViewWithToggle view={patientsView} setView={setPatientsView} onOpenPatient={openPatient} showOnlyActive={onlyActive} />
+            </>
+          )}
+          {page === 'agenda' && <AgendaView onOpenPatient={openPatient} />}
+          {page === 'testes' && <TestCatalogView />}
+          {page === 'patient' && <PatientDetail patientId={selectedPatient} onBack={backToList} onGoTo={setPage} />}
+        </main>
+      </div>
+
+      {/* Tweaks */}
+      {editMode ? (
+        <TweaksPanel
+          theme={theme} setTheme={setTheme}
+          density={density} setDensity={setDensity}
+          onlyActive={onlyActive} setOnlyActive={setOnlyActive}
+          patientsView={patientsView} setPatientsView={setPatientsView}
+          mainPage={page} setMainPage={setPage}
+        />
+      ) : (
+        <div className="tweaks-closed">
+          <I.sliders /> Ative <b style={{color:'var(--text)'}}>Tweaks</b> para configurar
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PatientsViewWithToggle({ view, setView, onOpenPatient, showOnlyActive }) {
+  const viewToggle = (
+    <div className="seg">
+      <button className={view==='kanban'?'active':''} onClick={()=>setView('kanban')}><I.board /> Kanban</button>
+      <button className={view==='list'?'active':''} onClick={()=>setView('list')}><I.list /> Lista</button>
+    </div>
+  );
+  return <PatientsView view={view} onOpenPatient={onOpenPatient} showOnlyActive={showOnlyActive} viewToggle={viewToggle} />;
+}
+
+function TestCatalogView() {
+  const { TEST_CATALOG } = window.CORTEX_DATA;
+  return (
+    <div>
+      <div className="section-head">
+        <h2>Catálogo de testes</h2>
+        <span className="sub">agrupados por função cognitiva — ajuste conforme a sua bateria</span>
+        <div className="right">
+          <button className="primary-btn"><I.plus /> Adicionar teste</button>
+        </div>
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap: 14}}>
+        {Object.entries(TEST_CATALOG).map(([cat, tests]) => (
+          <div className="card" key={cat}>
+            <h3 style={{marginBottom: 4}}>{cat}</h3>
+            <div className="sub" style={{marginBottom: 12}}>{tests.length} testes</div>
+            {tests.map(t => (
+              <div key={t.id} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderTop:'1px dashed var(--border)'}}>
+                <I.flask style={{width:14,height:14, color:'var(--text-3)'}} />
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13.5, fontWeight:500}}>{t.name}</div>
+                </div>
+                <span style={{fontFamily:'var(--font-mono)', fontSize:11.5, color:'var(--text-3)'}}>{t.duration}min</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TweaksPanel({ theme, setTheme, density, setDensity, onlyActive, setOnlyActive, patientsView, setPatientsView, mainPage, setMainPage }) {
+  function persist(edits) {
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+  }
+  return (
+    <div className="tweaks-panel open">
+      <h4><I.sliders /> Tweaks</h4>
+      <div className="sub">Ajuste o ambiente ao seu gosto</div>
+
+      <div className="tweak">
+        <div className="lbl">Tema</div>
+        <div className="seg">
+          <button className={theme==='light'?'active':''} onClick={()=>{setTheme('light'); persist({theme:'light'});}}><I.sun /> Claro</button>
+          <button className={theme==='dark'?'active':''} onClick={()=>{setTheme('dark'); persist({theme:'dark'});}}><I.moon /> Escuro</button>
+        </div>
+      </div>
+
+      <div className="tweak">
+        <div className="lbl">Visão principal de Pacientes</div>
+        <div className="seg">
+          <button className={patientsView==='kanban'?'active':''} onClick={()=>setPatientsView('kanban')}><I.board /> Kanban</button>
+          <button className={patientsView==='list'?'active':''} onClick={()=>setPatientsView('list')}><I.list /> Lista</button>
+        </div>
+      </div>
+
+      <div className="tweak">
+        <div className="lbl">Densidade</div>
+        <div className="seg">
+          <button className={density==='confortavel'?'active':''} onClick={()=>{setDensity('confortavel'); persist({density:'confortavel'});}}>Confortável</button>
+          <button className={density==='compact'?'active':''} onClick={()=>{setDensity('compact'); persist({density:'compact'});}}>Compacto</button>
+        </div>
+      </div>
+
+      <div className="tweak">
+        <div className="lbl">Filtros rápidos</div>
+        <div className="swrow">
+          <span>Mostrar apenas pacientes ativos</span>
+          <div className={"switch" + (onlyActive ? " on" : "")} onClick={()=>{setOnlyActive(!onlyActive); persist({onlyActive: !onlyActive});}} />
+        </div>
+      </div>
+
+      <div className="tweak">
+        <div className="lbl">Ir para</div>
+        <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+          {['dashboard','pacientes','agenda'].map(p => (
+            <button key={p} className={"chip-filter" + (mainPage === p ? " active" : "")} onClick={()=>setMainPage(p)}>{p}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { App, TweaksPanel, TestCatalogView, PatientsViewWithToggle });
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
