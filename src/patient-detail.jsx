@@ -6,6 +6,7 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
   const { PATIENTS, STAGES, TEST_CATALOG, TODAY } = window.CORTEX_DATA;
   const pac = PATIENTS.find(p => p.id === patientId);
   const [tab, setTab] = React.useState('anamnese');
+  const [editando, setEditando] = React.useState(false);
 
   if (!pac) return <div>Paciente não encontrado</div>;
 
@@ -13,6 +14,13 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
 
   return (
     <div>
+      {editando && (
+        <ModalEditarPaciente
+          pac={pac}
+          onClose={() => setEditando(false)}
+          onSaved={() => setEditando(false)}
+        />
+      )}
       {/* Back bar */}
       <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:14}}>
         <button className="ghost-btn" onClick={onBack}><I.chevL /> Pacientes</button>
@@ -47,7 +55,7 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
         </div>
         <div className="pd-actions">
           <button className="ghost-btn"><I.phone /> Contato</button>
-          <button className="ghost-btn"><I.edit /> Editar</button>
+          <button className="ghost-btn" onClick={() => setEditando(true)}><I.edit /> Editar</button>
           <button className="primary-btn" onClick={() => onNewSessao?.(patientId)}><I.plus /> Agendar sessão</button>
         </div>
       </div>
@@ -373,4 +381,108 @@ function TabLaudo({ pac }) {
   );
 }
 
-Object.assign(window, { PatientDetail, TabAnamnese, TabHipoteses, TabEscolar, TabBateria, TabLaudo });
+// Modal editar paciente
+function ModalEditarPaciente({ pac, onClose, onSaved }) {
+  const [form, setForm] = React.useState({
+    nome: pac.nome || '',
+    tipo: pac.tipo || 'Criança',
+    data_nasc: pac.dataNasc || '',
+    escolaridade: pac.escolaridade || '',
+    escola: pac.escola || '',
+    responsavel: pac.responsavel || '',
+    telefone: pac.telefone || '',
+    email: pac.email || '',
+    convenio: pac.convenio || 'Particular',
+    encaminhado_por: pac.encaminhadoPor || '',
+    queixa: pac.queixa || '',
+    estagio: pac.estagio || 'anamnese',
+    progresso: pac.progresso || 0,
+    previsao_laudo: pac.previsaoLaudo || '',
+    ativo: pac.ativo !== false,
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true); setErr('');
+    try {
+      await window.CORTEX_SB.updatePaciente(pac.id, form);
+      // Atualizar localmente
+      const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+      if (idx >= 0) {
+        window.CORTEX_DATA.PATIENTS[idx] = { ...window.CORTEX_DATA.PATIENTS[idx],
+          nome: form.nome, tipo: form.tipo, dataNasc: form.data_nasc,
+          escolaridade: form.escolaridade, escola: form.escola,
+          responsavel: form.responsavel, telefone: form.telefone,
+          email: form.email, convenio: form.convenio,
+          encaminhadoPor: form.encaminhado_por, queixa: form.queixa,
+          estagio: form.estagio, progresso: +form.progresso,
+          previsaoLaudo: form.previsao_laudo, ativo: form.ativo,
+        };
+      }
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      onSaved?.();
+      onClose();
+    } catch(e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const inp = {width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'inherit', fontSize:13, outline:'none'};
+  const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
+  const { STAGES } = window.CORTEX_DATA;
+  const conveniosSalvos = (() => { try { return JSON.parse(localStorage.getItem('cortex.config.geral') || '{}').convenios || []; } catch { return []; } })();
+  const convenioOpts = conveniosSalvos.length > 0 ? conveniosSalvos.filter(c=>c.ativo).map(c=>c.nome) : ['Particular','Unimed','Bradesco Saúde','SulAmérica','Amil','Hapvida','NotreDame','GNDI'];
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(680px,100%)',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h2 style={{margin:0,fontSize:18}}>Editar paciente</h2>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{gridColumn:'span 2'}}><label style={lbl}>Nome completo</label><input value={form.nome} onChange={e=>set('nome',e.target.value)} style={inp} required /></div>
+          <div><label style={lbl}>Tipo</label><select value={form.tipo} onChange={e=>set('tipo',e.target.value)} style={inp}>{['Criança','Adolescente','Adulto','Idoso'].map(t=><option key={t}>{t}</option>)}</select></div>
+          <div><label style={lbl}>Data nascimento</label><input type="date" value={form.data_nasc} onChange={e=>set('data_nasc',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Escolaridade</label><input value={form.escolaridade} onChange={e=>set('escolaridade',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Escola</label><input value={form.escola} onChange={e=>set('escola',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Responsável</label><input value={form.responsavel} onChange={e=>set('responsavel',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Telefone</label><input value={form.telefone} onChange={e=>set('telefone',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>E-mail</label><input type="email" value={form.email} onChange={e=>set('email',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Convênio</label>
+            <select value={form.convenio} onChange={e=>set('convenio',e.target.value)} style={inp}>
+              {convenioOpts.map(c=><option key={c}>{c}</option>)}
+              {!convenioOpts.includes(form.convenio) && <option value={form.convenio}>{form.convenio}</option>}
+            </select>
+          </div>
+          <div><label style={lbl}>Encaminhado por</label><input value={form.encaminhado_por} onChange={e=>set('encaminhado_por',e.target.value)} style={inp} /></div>
+          <div style={{gridColumn:'span 2'}}><label style={lbl}>Queixa principal</label><textarea value={form.queixa} onChange={e=>set('queixa',e.target.value)} rows={2} style={{...inp,resize:'vertical'}} /></div>
+          <div><label style={lbl}>Etapa atual</label>
+            <select value={form.estagio} onChange={e=>set('estagio',e.target.value)} style={inp}>
+              {STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+          <div><label style={lbl}>Progresso (%)</label><input type="number" min={0} max={100} value={form.progresso} onChange={e=>set('progresso',e.target.value)} style={inp} /></div>
+          <div><label style={lbl}>Previsão do laudo</label><input type="date" value={form.previsao_laudo} onChange={e=>set('previsao_laudo',e.target.value)} style={inp} /></div>
+          <div style={{display:'flex',alignItems:'center',gap:10,paddingTop:20}}>
+            <label style={{...lbl,margin:0}}>Ativo</label>
+            <div onClick={()=>set('ativo',!form.ativo)} style={{width:40,height:22,borderRadius:11,background:form.ativo?'var(--teal-500)':'var(--border)',cursor:'pointer',position:'relative',transition:'background 0.2s'}}>
+              <div style={{position:'absolute',top:2,left:form.ativo?20:2,width:18,height:18,borderRadius:9,background:'white',transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.3)'}}/>
+            </div>
+          </div>
+        </div>
+        {err && <div style={{marginTop:12,padding:'9px 12px',borderRadius:8,background:'color-mix(in oklab,var(--danger) 12%,var(--surface))',color:'var(--danger)',fontSize:13}}>⚠ {err}</div>}
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:20}}>
+          <button type="button" onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            {saving ? 'Salvando...' : 'Salvar alterações'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+Object.assign(window, { PatientDetail, TabAnamnese, TabHipoteses, TabEscolar, TabBateria, TabLaudo, ModalEditarPaciente });

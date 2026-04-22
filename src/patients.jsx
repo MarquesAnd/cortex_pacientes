@@ -21,7 +21,6 @@ function PatientsView({ view, onOpenPatient, showOnlyActive, viewToggle, onNewPa
         <h2>Pacientes</h2>
         <span className="sub">{list.length} de {PATIENTS.length} pacientes</span>
         <div className="right">
-          {viewToggle}
           <button className="ghost-btn"><I.filter /> Filtros</button>
           <button className="primary-btn" onClick={onNewPaciente}><I.plus /> Novo paciente</button>
         </div>
@@ -42,8 +41,7 @@ function PatientsView({ view, onOpenPatient, showOnlyActive, viewToggle, onNewPa
         ))}
       </div>
 
-      {view === 'list' && <ListTable patients={list} onOpenPatient={onOpenPatient} />}
-      {view === 'kanban' && <KanbanBoard patients={list} onOpenPatient={onOpenPatient} />}
+      <ListTable patients={list} onOpenPatient={onOpenPatient} />
     </div>
   );
 }
