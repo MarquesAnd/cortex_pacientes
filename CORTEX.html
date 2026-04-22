@@ -733,11 +733,35 @@ function ConfigPage({ profile, user, onProfileUpdate }) {
     React.useEffect(() => {
       if (!profile?.clinica_id) { setLoading(false); return; }
       SB.fetchClinica(profile.clinica_id)
-        .then(clinica => {
-          if (clinica?.convenios?.length)   setConvenios(clinica.convenios);
-          if (clinica?.etapas_fluxo?.length) setEtapas(clinica.etapas_fluxo);
+        .then(async (clinica) => {
+          if (clinica?.convenios?.length) {
+            // Supabase tem dados — usar eles
+            setConvenios(clinica.convenios);
+            if (clinica?.etapas_fluxo?.length) setEtapas(clinica.etapas_fluxo);
+          } else {
+            // Supabase vazio — verificar se tem dados no localStorage para migrar
+            const cached = (() => { try { return JSON.parse(localStorage.getItem('cortex.config.geral') || '{}'); } catch { return {}; } })();
+            if (cached.convenios?.length > 3) {
+              // Tem dados customizados no cache — migrar para o Supabase
+              const convs = cached.convenios;
+              const etps  = cached.etapas || DEFAULTS_ETAPAS;
+              setConvenios(convs);
+              setEtapas(etps);
+              try {
+                await SB.updateClinica(profile.clinica_id, { convenios: convs, etapas_fluxo: etps });
+              } catch(e) { console.warn('migração convenios:', e.message); }
+            } else if (cached.convenios?.length) {
+              setConvenios(cached.convenios);
+              if (cached.etapas?.length) setEtapas(cached.etapas);
+            }
+          }
         })
-        .catch(() => {})
+        .catch(() => {
+          // Fallback para localStorage se Supabase falhar
+          const cached = (() => { try { return JSON.parse(localStorage.getItem('cortex.config.geral') || '{}'); } catch { return {}; } })();
+          if (cached.convenios?.length) setConvenios(cached.convenios);
+          if (cached.etapas?.length) setEtapas(cached.etapas);
+        })
         .finally(() => setLoading(false));
     }, []);
 
