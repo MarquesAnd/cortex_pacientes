@@ -131,6 +131,9 @@ function App() {
     </div>
   );
 
+  const PATIENTS = window.CORTEX_DATA.PATIENTS;
+  const activeCount = PATIENTS.filter(p => p.ativo).length;
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <I.dash />, count: null },
     { id: 'pacientes', label: 'Pacientes', icon: <I.users />, count: activeCount },
