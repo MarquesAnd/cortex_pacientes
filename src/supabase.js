@@ -2,8 +2,8 @@
 // CORTEX — Supabase client + data access layer
 // ============================================================
 // Configure com as suas chaves do Supabase:
-const SUPABASE_URL  = 'https://SEU_PROJECT_REF.supabase.co';
-const SUPABASE_ANON = 'SUA_ANON_KEY';
+const SUPABASE_URL  = 'https://evxcwjlfpntopddtbjmq.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eGN3amxmcG50b3BkZHRiam1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MjI2NDksImV4cCI6MjA5MjM5ODY0OX0.FjCAEXP-ujTAJbtWNoD2_iKr9z8gQId_Wus1U7sguzQ';
 
 // ── REST helper ─────────────────────────────────────────────
 const SB_SESSION_KEY = 'cortex.session';
