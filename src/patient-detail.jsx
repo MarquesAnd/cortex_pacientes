@@ -11,7 +11,11 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
 
   const deletarPaciente = async () => {
     try {
-      await window.CORTEX_SB.deletePaciente(pac.id);
+      // Só chama o Supabase se o ID for um UUID válido (pacientes reais)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pac.id);
+      if (isUUID) {
+        await window.CORTEX_SB.deletePaciente(pac.id);
+      }
       window.CORTEX_DATA.PATIENTS = window.CORTEX_DATA.PATIENTS.filter(p => p.id !== pac.id);
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
       onBack();
