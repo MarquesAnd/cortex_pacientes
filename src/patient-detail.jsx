@@ -57,7 +57,10 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
           </div>
         </div>
         <div className="pd-actions">
-          <button className="ghost-btn"><I.phone /> Contato</button>
+          <button className="ghost-btn" onClick={() => {
+            const msg = `📋 ${pac.nome}\n📞 ${pac.telefone}\n📧 ${pac.email}\n👤 Responsável: ${pac.responsavel}`;
+            navigator.clipboard?.writeText(msg).then(() => alert('Dados copiados para a área de transferência!'));
+          }}><I.phone /> Contato</button>
           <button className="ghost-btn" onClick={() => setEditando(true)}><I.edit /> Editar</button>
           <button className="primary-btn" onClick={() => onNewSessao?.(patientId)}><I.plus /> Agendar sessão</button>
         </div>
@@ -125,7 +128,7 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
           {tab === 'hipoteses' && <TabHipoteses pac={pac} />}
           {tab === 'escolar' && <TabEscolar pac={pac} />}
           {tab === 'bateria' && <TabBateria pac={pac} />}
-          {tab === 'laudo' && <TabLaudo pac={pac} />}
+          {tab === 'laudo' && <TabLaudo pac={pac} onNewSessao={onNewSessao} />}
         </div>
       </div>
     </div>
@@ -134,65 +137,131 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
 
 // ---- Anamnese --------------------------------------------------------
 function TabAnamnese({ pac }) {
+  const [editSecao, setEditSecao] = React.useState(null); // id da seção sendo editada
+  const [dados, setDados] = React.useState(pac.anamnese?.dados || {});
+  const [secoes, setSecoes] = React.useState(pac.anamnese?.secoes || {});
+  const [saving, setSaving] = React.useState(false);
+
   const sections = [
-    { id:'identificacao', label:'Identificação', fields:[{lbl:'Queixa principal', val: pac.queixa}, {lbl:'Encaminhado por', val: pac.encaminhadoPor}] },
+    { id:'identificacao', label:'Identificação', fields:[
+      {lbl:'Queixa principal', key:'queixa_principal', val: pac.queixa},
+      {lbl:'Encaminhado por', key:'encaminhado_por', val: pac.encaminhadoPor},
+    ]},
     { id:'queixa', label:'Queixa e histórico', fields:[
-      {lbl:'Início dos sintomas', val: 'Há aproximadamente 2 anos, com agravamento progressivo.'},
-      {lbl:'Fatores desencadeantes', val: 'Mudança de escola + pressão acadêmica crescente.'},
+      {lbl:'Início dos sintomas', key:'inicio_sintomas'},
+      {lbl:'Fatores desencadeantes', key:'fatores_desencadeantes'},
     ]},
     { id:'desenvolvimento', label:'Desenvolvimento', fields:[
-      {lbl:'Gestação / parto', val: 'Sem intercorrências. Parto cesárea, 39 semanas.'},
-      {lbl:'Marcos motores', val: 'Dentro do esperado. Engatinhou 8m, andou 13m.'},
-      {lbl:'Linguagem', val: 'Primeiras palavras 12m; frases 24m.'},
+      {lbl:'Gestação / parto', key:'gestacao_parto'},
+      {lbl:'Marcos motores', key:'marcos_motores'},
+      {lbl:'Linguagem', key:'linguagem'},
     ]},
     { id:'familia', label:'Contexto familiar', fields:[
-      {lbl:'Composição familiar', val: 'Mora com pais e irmão mais novo (5 anos).'},
-      {lbl:'Antecedentes psiquiátricos', val: 'Tio materno com diagnóstico de TDAH.'},
+      {lbl:'Composição familiar', key:'composicao_familiar'},
+      {lbl:'Antecedentes psiquiátricos', key:'antecedentes_psiq'},
     ]},
     { id:'escolar', label:'Histórico escolar', fields:[
-      {lbl:'Escola atual', val: pac.escola},
-      {lbl:'Desempenho', val: 'Oscilante. Boa em ciências, dificuldade persistente em português.'},
+      {lbl:'Escola atual', key:'escola_atual', val: pac.escola},
+      {lbl:'Desempenho', key:'desempenho_escolar'},
     ]},
     { id:'saude', label:'Saúde e medicações', fields:[
-      {lbl:'Condições', val: 'Nega comorbidades clínicas relevantes.'},
-      {lbl:'Medicações em uso', val: 'Nenhuma.'},
+      {lbl:'Condições', key:'condicoes_saude'},
+      {lbl:'Medicações em uso', key:'medicacoes'},
     ]},
     { id:'social', label:'Social e emocional', fields:[
-      {lbl:'Relacionamentos', val: 'Bom com pares; retraída em novos contextos.'},
-      {lbl:'Sono / alimentação', val: 'Sono fragmentado; alimentação seletiva.'},
+      {lbl:'Relacionamentos', key:'relacionamentos'},
+      {lbl:'Sono / alimentação', key:'sono_alimentacao'},
     ]},
     { id:'medicacoes', label:'Outros profissionais', fields:[
-      {lbl:'Equipe', val: 'Fonoaudióloga semanal, pediatra anual.'},
+      {lbl:'Equipe', key:'equipe_outros'},
     ]},
   ];
 
+  const saveSecao = async (secId, newDados) => {
+    setSaving(true);
+    try {
+      const updatedSecoes = { ...secoes, [secId]: true };
+      const updatedDados  = { ...dados, ...newDados };
+      const preenchidas = Object.values(updatedSecoes).filter(Boolean).length;
+      const completude  = Math.round((preenchidas / sections.length) * 100);
+      await window.CORTEX_SB.upsertAnamnese(pac.id, pac.clinica_id || window._clinicaId, {
+        secoes: updatedSecoes, dados: updatedDados, completude,
+      });
+      setSecoes(updatedSecoes);
+      setDados(updatedDados);
+      const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+      if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].anamnese = { completude, secoes: updatedSecoes, dados: updatedDados };
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      setEditSecao(null);
+    } catch(e) { alert('Erro ao salvar: ' + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const completude = Math.round((Object.values(secoes).filter(Boolean).length / sections.length) * 100);
+
   return (
     <div>
-      <div style={{display:'flex', gap:10, alignItems:'center', marginBottom: 14}}>
-        <strong style={{fontSize: 14}}>Completude:</strong>
-        <div style={{flex:1, maxWidth: 240}}><Progress value={pac.anamnese?.completude || 0} /></div>
-        <span style={{fontFamily:'var(--font-mono)', fontSize:13}}>{pac.anamnese?.completude || 0}%</span>
-        <button className="ghost-btn" style={{marginLeft:'auto'}}><I.edit /> Editar</button>
+      <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:14}}>
+        <strong style={{fontSize:14}}>Completude:</strong>
+        <div style={{flex:1, maxWidth:240}}><Progress value={completude} /></div>
+        <span style={{fontFamily:'var(--font-mono)', fontSize:13}}>{completude}%</span>
       </div>
       <div className="anamnese-grid">
         {sections.map(s => {
-          const done = pac.anamnese?.secoes?.[s.id];
+          const done = secoes[s.id];
           return (
             <div className="anamnese-section" key={s.id}>
               <div className="head">
                 <strong>{s.label}</strong>
                 <span className={"status" + (done ? "" : " pending")}>{done ? 'Preenchido' : 'Pendente'}</span>
+                <button onClick={() => setEditSecao(s.id)} style={{marginLeft:'auto',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'2px 10px',fontSize:12,color:'var(--text-3)',cursor:'pointer'}}>
+                  <I.edit style={{width:11,height:11}} /> {done ? 'Editar' : 'Preencher'}
+                </button>
               </div>
               {s.fields.map((f, i) => (
                 <div className="form-row" key={i}>
                   <label>{f.lbl}</label>
-                  <div className={"value" + (done ? '' : ' placeholder')}>{done ? f.val : 'Ainda não preenchido'}</div>
+                  <div className={"value" + (done ? '' : ' placeholder')}>
+                    {done ? (dados[f.key] || f.val || '—') : 'Ainda não preenchido'}
+                  </div>
                 </div>
               ))}
             </div>
           );
         })}
       </div>
+
+      {/* Modal de edição de seção */}
+      {editSecao && (() => {
+        const sec = sections.find(s => s.id === editSecao);
+        const [formSec, setFormSec] = React.useState(() =>
+          sec.fields.reduce((acc, f) => ({ ...acc, [f.key]: dados[f.key] || f.val || '' }), {})
+        );
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={() => setEditSecao(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                <h3 style={{margin:0}}>{sec.label}</h3>
+                <button onClick={() => setEditSecao(null)} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+              </div>
+              {sec.fields.map(f => (
+                <div key={f.key} style={{marginBottom:14}}>
+                  <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--text-3)',marginBottom:6}}>{f.lbl}</label>
+                  <textarea value={formSec[f.key]} onChange={e => setFormSec(v => ({...v, [f.key]: e.target.value}))}
+                    rows={3} style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,resize:'vertical',outline:'none'}} />
+                </div>
+              ))}
+              <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+                <button onClick={() => setEditSecao(null)} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+                <button onClick={() => saveSecao(editSecao, formSec)} disabled={saving}
+                  style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -200,12 +269,103 @@ function TabAnamnese({ pac }) {
 // ---- Hipóteses -------------------------------------------------------
 function TabHipoteses({ pac }) {
   const statusLabel = { 'em-investigacao':'Em investigação', 'confirmada':'Confirmada', 'descartada':'Descartada' };
-  const hyps = pac.hipoteses || [];
+  const [hyps, setHyps] = React.useState(pac.hipoteses || []);
+  const [showModal, setShowModal] = React.useState(false);
+  const [editHyp, setEditHyp] = React.useState(null);
+  const clinicaId = pac.clinica_id || window._clinicaId;
+
+  const syncLocal = (updated) => {
+    setHyps(updated);
+    const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+    if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].hipoteses = updated;
+    window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+  };
+
+  const saveHyp = async (form) => {
+    try {
+      if (form.id) {
+        await window.CORTEX_SB.updateHipotese(form.id, { titulo: form.titulo, status: form.status, peso: +form.peso, evidencias: form.evidencias });
+        syncLocal(hyps.map(h => h.id === form.id ? {...h, ...form} : h));
+      } else {
+        const saved = await window.CORTEX_SB.createHipotese({ paciente_id: pac.id, titulo: form.titulo, status: form.status, peso: +form.peso, evidencias: form.evidencias }, clinicaId);
+        syncLocal([...hyps, saved]);
+      }
+      setShowModal(false); setEditHyp(null);
+    } catch(e) { alert('Erro: ' + e.message); }
+  };
+
+  const deleteHyp = async (id) => {
+    if (!confirm('Remover esta hipótese?')) return;
+    await window.CORTEX_SB.deleteHipotese(id).catch(()=>{});
+    syncLocal(hyps.filter(h => h.id !== id));
+  };
+
+  const HypModal = ({ hyp, onClose, onSave }) => {
+    const [f, setF] = React.useState({
+      id: hyp?.id || null, titulo: hyp?.titulo || '', status: hyp?.status || 'em-investigacao',
+      peso: hyp?.peso ?? 2, evidencias: hyp?.evidencias || [],
+    });
+    const [novaEvid, setNovaEvid] = React.useState('');
+    const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'};
+    return (
+      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+            <h3 style={{margin:0}}>{f.id ? 'Editar hipótese' : 'Nova hipótese'}</h3>
+            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Hipótese diagnóstica</label>
+            <input value={f.titulo} onChange={e=>setF(v=>({...v,titulo:e.target.value}))} style={inp} placeholder="Ex: TDAH — Apresentação Combinada" autoFocus />
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            <div>
+              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Status</label>
+              <select value={f.status} onChange={e=>setF(v=>({...v,status:e.target.value}))} style={inp}>
+                <option value="em-investigacao">Em investigação</option>
+                <option value="confirmada">Confirmada</option>
+                <option value="descartada">Descartada</option>
+              </select>
+            </div>
+            <div>
+              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Peso clínico (0–3)</label>
+              <input type="number" min={0} max={3} value={f.peso} onChange={e=>setF(v=>({...v,peso:e.target.value}))} style={inp} />
+            </div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Evidências</label>
+            <div style={{display:'flex',gap:8,marginBottom:8}}>
+              <input value={novaEvid} onChange={e=>setNovaEvid(e.target.value)}
+                onKeyDown={e=>{if(e.key==='Enter'&&novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
+                style={inp} placeholder="Ex: WISC-IV: FDI baixo (Enter para adicionar)" />
+              <button onClick={()=>{if(novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
+                style={{padding:'9px 14px',borderRadius:8,border:'none',background:'var(--teal-500)',color:'white',cursor:'pointer',whiteSpace:'nowrap',fontSize:13}}>+</button>
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {f.evidencias.map((e,i) => (
+                <span key={i} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:999,background:'var(--surface-2)',border:'1px solid var(--border)',fontSize:12}}>
+                  {e}<button onClick={()=>setF(v=>({...v,evidencias:v.evidencias.filter((_,j)=>j!==i)}))} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:0,fontSize:14,lineHeight:1}}>✕</button>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+            <button onClick={()=>onSave(f)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+              {f.id ? 'Salvar' : 'Criar hipótese'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
+      {(showModal || editHyp) && <HypModal hyp={editHyp} onClose={() => { setShowModal(false); setEditHyp(null); }} onSave={saveHyp} />}
       <div style={{display:'flex', alignItems:'center', marginBottom:14}}>
         <span className="sub" style={{color:'var(--text-3)', fontSize:13}}>Hipóteses diagnósticas com evidências vinculadas aos testes aplicados.</span>
-        <button className="primary-btn" style={{marginLeft:'auto'}}><I.plus /> Nova hipótese</button>
+        <button className="primary-btn" style={{marginLeft:'auto'}} onClick={() => setShowModal(true)}><I.plus /> Nova hipótese</button>
       </div>
       {hyps.map(h => (
         <div className={"hyp-card " + h.status} key={h.id}>
@@ -215,6 +375,8 @@ function TabHipoteses({ pac }) {
             <div className="weight" title="Peso clínico">
               {[0,1,2,3].map(i => <span key={i} className={"w" + (i < h.peso ? " on" : "")} />)}
             </div>
+            <button onClick={() => setEditHyp(h)} style={{marginLeft:'auto',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'2px 10px',fontSize:12,color:'var(--text-3)',cursor:'pointer'}}><I.edit style={{width:11,height:11}} /></button>
+            <button onClick={() => deleteHyp(h.id)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:4}} onMouseEnter={e=>e.currentTarget.style.color='var(--danger)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}><I.trash style={{width:13,height:13}} /></button>
           </div>
           <div style={{color:'var(--text-2)', fontSize:13, lineHeight:1.5}}>
             {h.status === 'confirmada' && 'Confirmada pelos achados nos testes e entrevista clínica.'}
@@ -223,7 +385,7 @@ function TabHipoteses({ pac }) {
           </div>
           <div className="evidencias">
             <span style={{fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, alignSelf:'center', marginRight:4}}>Evidências:</span>
-            {h.evidencias.length ? h.evidencias.map((e, i) => <span className="tag" key={i}>{e}</span>) : <span className="tag none">nenhuma vinculada ainda</span>}
+            {(h.evidencias||[]).length ? h.evidencias.map((e, i) => <span className="tag" key={i}>{e}</span>) : <span className="tag none">nenhuma vinculada ainda</span>}
           </div>
         </div>
       ))}
@@ -278,57 +440,183 @@ function TabBateria({ pac }) {
 
   const done = testes.filter(t => t.status === 'aplicado').length;
 
-  if (testes.length === 0) {
+  const [localTestes, setLocalTestes] = React.useState(testes);
+  const [showAddModal, setShowAddModal]       = React.useState(false);
+  const [registrando, setRegistrando]         = React.useState(null); // teste sendo registrado
+  const clinicaId = pac.clinica_id || window._clinicaId;
+
+  const syncTestes = (updated) => {
+    setLocalTestes(updated);
+    const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+    if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].testes = updated;
+    window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+  };
+
+  const registrarAplicacao = async (teste, dataAplicada) => {
+    try {
+      const patch = { status: 'aplicado', aplicada: dataAplicada };
+      if (teste.dbId) {
+        await window.CORTEX_SB.updateTestePaciente(teste.dbId, patch);
+      }
+      syncTestes(localTestes.map(t => t.id === teste.id ? {...t, ...patch} : t));
+      setRegistrando(null);
+    } catch(e) { alert('Erro: ' + e.message); }
+  };
+
+  const adicionarTeste = async (testeId, prevista) => {
+    try {
+      const saved = await window.CORTEX_SB.createTestePaciente({ paciente_id: pac.id, teste_id: testeId, prevista, status: 'pendente' }, clinicaId);
+      const info = findTest(testeId);
+      const novo = { id: testeId, dbId: saved.id, status: 'pendente', prevista, aplicada: null, ...info };
+      syncTestes([...localTestes, novo]);
+      setShowAddModal(false);
+    } catch(e) { alert('Erro: ' + e.message); }
+  };
+
+  const removerTeste = async (teste) => {
+    if (!confirm('Remover este teste da bateria?')) return;
+    if (teste.dbId) await window.CORTEX_SB.deleteTestePaciente(teste.dbId).catch(()=>{});
+    syncTestes(localTestes.filter(t => t.id !== teste.id));
+  };
+
+  // Recalcular com localTestes
+  const byCatLocal = {};
+  localTestes.forEach(t => {
+    const info = findTest(t.id);
+    (byCatLocal[info.cat] = byCatLocal[info.cat] || []).push({ ...t, ...info });
+  });
+  const catsLocal = Object.keys(byCatLocal);
+  const doneLocal = localTestes.filter(t => t.status === 'aplicado').length;
+
+  // Modal registrar aplicação
+  const RegistrarModal = ({ teste, onClose }) => {
+    const [data, setData] = React.useState(new Date().toISOString().slice(0,10));
     return (
-      <div className="card" style={{textAlign:'center', padding: 40}}>
-        <I.flask style={{width:32, height:32, color:'var(--text-3)', margin:'0 auto'}} />
-        <h3 style={{marginTop:12}}>Bateria ainda não montada</h3>
-        <div className="sub" style={{marginTop:4}}>Selecione testes do catálogo após concluir anamnese e hipóteses.</div>
-        <button className="primary-btn" style={{marginTop:14}}><I.plus /> Montar bateria</button>
+      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(420px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+          <h3 style={{margin:'0 0 20px'}}>Registrar aplicação</h3>
+          <div style={{fontWeight:600,marginBottom:16,fontSize:14}}>{teste.name}</div>
+          <div style={{marginBottom:20}}>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Data de aplicação</label>
+            <input type="date" value={data} onChange={e=>setData(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}} />
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+            <button onClick={()=>registrarAplicacao(teste,data)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+              ✓ Confirmar aplicação
+            </button>
+          </div>
+        </div>
       </div>
+    );
+  };
+
+  // Modal adicionar teste
+  const AdicionarTesteModal = ({ onClose }) => {
+    const [q, setQ] = React.useState('');
+    const [sel, setSel] = React.useState('');
+    const [prevista, setPrevista] = React.useState('');
+    const jaAdicionados = new Set(localTestes.map(t => t.id));
+    const todos = Object.entries(TEST_CATALOG).flatMap(([cat, ts]) => ts.map(t => ({...t, cat})));
+    const filtrados = todos.filter(t => !jaAdicionados.has(t.id) && (!q || t.name.toLowerCase().includes(q.toLowerCase()) || t.avalia?.toLowerCase().includes(q.toLowerCase())));
+    return (
+      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <h3 style={{margin:0}}>Adicionar instrumento</h3>
+            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+          </div>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar instrumento..." style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',marginBottom:12}} />
+          <div style={{flex:1,overflowY:'auto',marginBottom:16,border:'1px solid var(--border)',borderRadius:8}}>
+            {filtrados.slice(0,40).map(t => (
+              <div key={t.id} onClick={()=>setSel(t.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid var(--border)',background: sel===t.id ? 'var(--surface-2)' : 'transparent'}}>
+                <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel===t.id ? 'var(--teal-500)' : 'var(--border)'}`,background: sel===t.id ? 'var(--teal-500)' : 'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
+                  {sel===t.id && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{t.name}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)'}}>{t.avalia} · {t.faixa}</div>
+                </div>
+              </div>
+            ))}
+            {filtrados.length === 0 && <div style={{padding:20,textAlign:'center',color:'var(--text-3)',fontSize:13}}>Nenhum instrumento encontrado</div>}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{flex:1}}>
+              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:4}}>Data prevista</label>
+              <input type="date" value={prevista} onChange={e=>setPrevista(e.target.value)} style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}} />
+            </div>
+            <button onClick={()=>sel && adicionarTeste(sel, prevista)} disabled={!sel} style={{padding:'10px 20px',borderRadius:8,border:'none',background: sel ? 'linear-gradient(135deg,var(--teal-500),var(--pink-500))' : 'var(--border)',color:'white',fontWeight:600,cursor: sel ? 'pointer' : 'not-allowed',fontSize:13,marginTop:20,whiteSpace:'nowrap'}}>
+              + Adicionar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (localTestes.length === 0) {
+    return (
+      <>
+        {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} />}
+        <div className="card" style={{textAlign:'center', padding: 40}}>
+          <I.flask style={{width:32, height:32, color:'var(--text-3)', margin:'0 auto'}} />
+          <h3 style={{marginTop:12}}>Bateria ainda não montada</h3>
+          <div className="sub" style={{marginTop:4}}>Selecione testes do catálogo após concluir anamnese e hipóteses.</div>
+          <button className="primary-btn" style={{marginTop:14}} onClick={() => setShowAddModal(true)}><I.plus /> Montar bateria</button>
+        </div>
+      </>
     );
   }
 
   return (
-    <div>
-      <div style={{display:'flex', gap:14, alignItems:'center', marginBottom:14}}>
-        <strong style={{fontSize: 14}}>{done} de {testes.length} aplicados</strong>
-        <div style={{flex:1, maxWidth: 240}}><Progress value={(done/testes.length)*100} /></div>
-        <button className="ghost-btn" style={{marginLeft:'auto'}}><I.plus /> Adicionar teste</button>
-      </div>
-
-      {cats.map(cat => (
-        <div className="battery-group" key={cat}>
-          <h4>{cat} <span className="cnt">· {byCat[cat].filter(t=>t.status==='aplicado').length}/{byCat[cat].length}</span></h4>
-          {byCat[cat].map(t => {
-            const overdue = isTestOverdue(t, TODAY);
-            return (
-              <div className={"test-row " + t.status} key={t.id}>
-                <div className="check">{t.status === 'aplicado' && <I.check />}</div>
-                <div>
-                  <div className="name">{t.name}</div>
-                  {t.obs && <span className="obs">{t.obs}</span>}
-                </div>
-                <div className="dates">
-                  <span className="lbl">Prevista</span>
-                  <span style={{color: overdue ? 'var(--danger)' : ''}}>{fmtDateBR(t.prevista)}</span>
-                </div>
-                <div className="dates">
-                  <span className="lbl">Aplicada</span>
-                  <span>{t.aplicada ? fmtDateBR(t.aplicada) : '—'}</span>
-                </div>
-                <div>
-                  <span className={"pill " + (t.status === 'aplicado' ? 'ok' : t.status === 'agendado' ? 'teal' : overdue ? 'danger' : '')}>
-                    {overdue ? 'Atrasado' : t.status === 'aplicado' ? 'Aplicado' : t.status === 'agendado' ? 'Agendado' : 'Pendente'}
-                  </span>
-                </div>
-                <button className="small">{t.status === 'aplicado' ? 'Ver' : 'Registrar'}</button>
-              </div>
-            );
-          })}
+    <>
+      {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} />}
+      {registrando && <RegistrarModal teste={registrando} onClose={() => setRegistrando(null)} />}
+      <div>
+        <div style={{display:'flex', gap:14, alignItems:'center', marginBottom:14}}>
+          <strong style={{fontSize: 14}}>{doneLocal} de {localTestes.length} aplicados</strong>
+          <div style={{flex:1, maxWidth: 240}}><Progress value={localTestes.length ? (doneLocal/localTestes.length)*100 : 0} /></div>
+          <button className="ghost-btn" style={{marginLeft:'auto'}} onClick={() => setShowAddModal(true)}><I.plus /> Adicionar teste</button>
         </div>
-      ))}
-    </div>
+
+        {catsLocal.map(cat => (
+          <div className="battery-group" key={cat}>
+            <h4>{cat} <span className="cnt">· {byCatLocal[cat].filter(t=>t.status==='aplicado').length}/{byCatLocal[cat].length}</span></h4>
+            {byCatLocal[cat].map(t => {
+              const overdue = isTestOverdue(t, TODAY);
+              return (
+                <div className={"test-row " + t.status} key={t.id + t.status}>
+                  <div className="check">{t.status === 'aplicado' && <I.check />}</div>
+                  <div>
+                    <div className="name">{t.name}</div>
+                    {t.obs && <span className="obs">{t.obs}</span>}
+                  </div>
+                  <div className="dates">
+                    <span className="lbl">Prevista</span>
+                    <span style={{color: overdue ? 'var(--danger)' : ''}}>{fmtDateBR(t.prevista)}</span>
+                  </div>
+                  <div className="dates">
+                    <span className="lbl">Aplicada</span>
+                    <span>{t.aplicada ? fmtDateBR(t.aplicada) : '—'}</span>
+                  </div>
+                  <div>
+                    <span className={"pill " + (t.status === 'aplicado' ? 'ok' : t.status === 'agendado' ? 'teal' : overdue ? 'danger' : '')}>
+                      {overdue ? 'Atrasado' : t.status === 'aplicado' ? 'Aplicado' : t.status === 'agendado' ? 'Agendado' : 'Pendente'}
+                    </span>
+                  </div>
+                  {t.status === 'aplicado'
+                    ? <button className="small" onClick={() => setRegistrando(t)}>Ver</button>
+                    : <button className="small" onClick={() => setRegistrando(t)}>Registrar</button>
+                  }
+                  <button onClick={() => removerTeste(t)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:4}} onMouseEnter={e=>e.currentTarget.style.color='var(--danger)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}><I.trash style={{width:12,height:12}} /></button>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -375,7 +663,7 @@ function TabLaudo({ pac }) {
           <button className={ready ? 'primary-btn' : 'ghost-btn'} disabled={!ready} style={{width:'100%', justifyContent:'center'}}>
             <I.doc /> {ready ? 'Gerar PDF do laudo' : 'Aguardando testes'}
           </button>
-          <button className="ghost-btn" style={{width:'100%', justifyContent:'center', marginTop:8}}>
+          <button className="ghost-btn" onClick={() => onNewSessao?.(pac.id)} style={{width:'100%', justifyContent:'center', marginTop:8}}>
             <I.cal /> Agendar devolutiva
           </button>
         </div>

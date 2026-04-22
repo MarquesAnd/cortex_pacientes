@@ -64,7 +64,7 @@ function App() {
       setUser(me);
       const prof = await window.CORTEX_SB.cortexGetProfile(me.id).catch(() => null);
       setProfile(prof);
-      if (prof?.clinica_id) await hydratePacientes(prof.clinica_id);
+      if (prof?.clinica_id) { window._clinicaId = prof.clinica_id; await hydratePacientes(prof.clinica_id); }
       setAuthReady(true);
     })();
     window.addEventListener('cortex-session-changed', (e) => {
