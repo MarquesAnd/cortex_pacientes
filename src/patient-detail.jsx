@@ -742,7 +742,7 @@ function TabBateria({ pac }) {
 }
 
 // ---- Laudo -----------------------------------------------------------
-function TabLaudo({ pac }) {
+function TabLaudo({ pac, onNewSessao }) {
   const hypsConfirm = (pac.hipoteses || []).filter(h => h.status === 'confirmada');
   const testsDone = (pac.testes || []).filter(t => t.status === 'aplicado').length;
   const ready = pac.progresso >= 70;
@@ -781,7 +781,9 @@ function TabLaudo({ pac }) {
           <div style={{fontSize:12, color:'var(--text-3)', marginBottom: 16}}>
             Entregar até <b style={{color: pac.previsaoLaudo < window.CORTEX_DATA.TODAY ? 'var(--danger)' : 'var(--text)'}}>{fmtDateBR(pac.previsaoLaudo)}</b>
           </div>
-          <button className={ready ? 'primary-btn' : 'ghost-btn'} disabled={!ready} style={{width:'100%', justifyContent:'center'}}>
+          <button className={ready ? 'primary-btn' : 'ghost-btn'} disabled={!ready}
+            onClick={() => ready && window.print()}
+            style={{width:'100%', justifyContent:'center'}}>
             <I.doc /> {ready ? 'Gerar PDF do laudo' : 'Aguardando testes'}
           </button>
           <button className="ghost-btn" onClick={() => onNewSessao?.(pac.id)} style={{width:'100%', justifyContent:'center', marginTop:8}}>
