@@ -17,6 +17,7 @@
 <body>
 <div id="root"></div>
 
+<script src="src/supabase.js"></script>
 <script src="src/data.js"></script>
 <script type="text/babel" src="src/ui.jsx"></script>
 <script type="text/babel" src="src/dashboard.jsx"></script>
@@ -33,6 +34,46 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 function App() {
+  // Auth guard
+  const [authReady, setAuthReady] = React.useState(false);
+  const [user, setUser] = React.useState(null);
+  const [profile, setProfile] = React.useState(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const me = await window.CORTEX_SB.cortexGetMe().catch(() => null);
+      if (!me) { window.location.href = 'Login.html'; return; }
+      setUser(me);
+      const prof = await window.CORTEX_SB.cortexGetProfile(me.id).catch(() => null);
+      setProfile(prof);
+      if (prof?.clinica_id) {
+        await hydratePacientes(prof.clinica_id);
+      }
+      setAuthReady(true);
+    })();
+    const onSessaoChanged = () => {};
+    window.addEventListener('cortex-session-changed', (e) => {
+      if (!e.detail) window.location.href = 'Login.html';
+    });
+  }, []);
+
+  const hydratePacientes = async (clinicaId) => {
+    try {
+      const [pacs, sess] = await Promise.all([
+        window.CORTEX_SB.fetchPacientes(clinicaId),
+        window.CORTEX_SB.fetchSessoes(clinicaId),
+      ]);
+      // Substituir os dados mock pelos dados reais
+      if (pacs && pacs.length > 0) {
+        window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
+      }
+      if (sess && sess.length > 0) {
+        window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
+      }
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+    } catch (e) { console.warn('hydratePacientes', e); }
+  };
+
   // Load persisted
   const stored = (() => { try { return JSON.parse(localStorage.getItem('cortex.state') || '{}'); } catch { return {}; } })();
   const [theme, setTheme] = React.useState(stored.theme || TWEAK_DEFAULTS.theme);
@@ -42,6 +83,23 @@ function App() {
   const [patientsView, setPatientsView] = React.useState(stored.patientsView || 'kanban');
   const [selectedPatient, setSelectedPatient] = React.useState(stored.selectedPatient || null);
   const [editMode, setEditMode] = React.useState(false);
+  const [, tick] = React.useReducer(x => x + 1, 0);
+
+  React.useEffect(() => {
+    window.addEventListener('cortex-data-updated', tick);
+    return () => window.removeEventListener('cortex-data-updated', tick);
+  }, []);
+
+  if (!authReady) return (
+    <div style={{display:'grid', placeItems:'center', height:'100vh', background:'var(--bg)'}}>
+      <div style={{textAlign:'center'}}>
+        <div style={{width:48,height:48,borderRadius:12,overflow:'hidden',margin:'0 auto 16px'}}>
+          <img src="assets/cortex-logo.png" style={{width:'100%'}} />
+        </div>
+        <div style={{color:'var(--text-3)', fontSize:14}}>Carregando...</div>
+      </div>
+    </div>
+  );
 
   // Persist
   React.useEffect(() => {
@@ -70,6 +128,13 @@ function App() {
 
   const openPatient = (id) => { setSelectedPatient(id); setPage('patient'); };
   const backToList = () => { setSelectedPatient(null); setPage('pacientes'); };
+
+  const [showPacienteModal, setShowPacienteModal] = React.useState(false);
+  const [showSessaoModal, setShowSessaoModal]   = React.useState(false);
+  const [preselectPacId, setPreselectPacId]     = React.useState(null);
+
+  const openSessaoModal = (pacId = null) => { setPreselectPacId(pacId); setShowSessaoModal(true); };
+  const openPacienteModal = () => setShowPacienteModal(true);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <I.dash />, count: null },
@@ -103,15 +168,25 @@ function App() {
         ))}
 
         <div className="nav-section-label" style={{marginTop: 8}}>Atalhos</div>
-        <div className="nav-item"><I.plus /> <span>Novo paciente</span></div>
+        <div className="nav-item" onClick={openPacienteModal}><I.plus /> <span>Novo paciente</span></div>
         <div className="nav-item"><I.bell /> <span>Alertas</span><span className="count" style={{color:'var(--danger)'}}>3</span></div>
 
         <div className="sidebar-footer">
-          <div className="user-card">
-            <div className="avatar">DR</div>
+          <div className="user-card" style={{cursor:'pointer'}} onClick={async () => {
+            if (confirm('Sair do CORTEX?')) {
+              await window.CORTEX_SB.cortexSignOut();
+              window.location.href = 'Login.html';
+            }
+          }}>
+            <div className="avatar" style={{
+              background: 'linear-gradient(135deg, var(--teal-500), var(--pink-500))',
+              display:'grid', placeItems:'center', color:'white', fontWeight:700, fontSize:13,
+            }}>
+              {(profile?.nome || user?.email || 'U').slice(0,2).toUpperCase()}
+            </div>
             <div className="meta">
-              <strong>Dra. usuária</strong><br/>
-              <span>Neuropsicóloga</span>
+              <strong>{profile?.nome || user?.email?.split('@')[0] || 'Usuário'}</strong><br/>
+              <span>{profile?.especialidade || 'Neuropsicóloga'}</span>
             </div>
           </div>
         </div>
@@ -132,21 +207,39 @@ function App() {
             {theme === 'dark' ? <I.sun /> : <I.moon />}
           </button>
           <button className="icon-btn" title="Notificações"><I.bell /></button>
-          <button className="primary-btn"><I.plus /> Sessão</button>
+          <button className="primary-btn" onClick={() => setShowSessaoModal(true)}><I.plus /> Sessão</button>
         </header>
 
         <main className="scroll-area">
-          {page === 'dashboard' && <Dashboard onOpenPatient={openPatient} onGoTo={setPage} />}
+          {page === 'dashboard' && <Dashboard onOpenPatient={openPatient} onGoTo={setPage} onNewSessao={openSessaoModal} onNewPaciente={openPacienteModal} />}
           {page === 'pacientes' && (
             <>
-              <PatientsViewWithToggle view={patientsView} setView={setPatientsView} onOpenPatient={openPatient} showOnlyActive={onlyActive} />
+              <PatientsViewWithToggle view={patientsView} setView={setPatientsView} onOpenPatient={openPatient} showOnlyActive={onlyActive} onNewPaciente={openPacienteModal} />
             </>
           )}
-          {page === 'agenda' && <AgendaView onOpenPatient={openPatient} />}
+          {page === 'agenda' && <AgendaView onOpenPatient={openPatient} onNewSessao={openSessaoModal} />}
           {page === 'testes' && <TestCatalogView />}
-          {page === 'patient' && <PatientDetail patientId={selectedPatient} onBack={backToList} onGoTo={setPage} />}
+          {page === 'patient' && <PatientDetail patientId={selectedPatient} onBack={backToList} onGoTo={setPage} onNewSessao={openSessaoModal} />}
         </main>
       </div>
+
+      {/* Modais globais */}
+      {showPacienteModal && (
+        <ModalNovoPaciente
+          onClose={() => setShowPacienteModal(false)}
+          onSaved={() => {}}
+          profile={profile} user={user}
+        />
+      )}
+      {showSessaoModal && (
+        <ModalAgendarSessao
+          pacientes={window.CORTEX_DATA.PATIENTS.filter(p => p.ativo)}
+          onClose={() => setShowSessaoModal(false)}
+          onSaved={() => {}}
+          profile={profile} user={user}
+          preselectedPacId={preselectPacId}
+        />
+      )}
 
       {/* Tweaks */}
       {editMode ? (
@@ -166,14 +259,14 @@ function App() {
   );
 }
 
-function PatientsViewWithToggle({ view, setView, onOpenPatient, showOnlyActive }) {
+function PatientsViewWithToggle({ view, setView, onOpenPatient, showOnlyActive, onNewPaciente }) {
   const viewToggle = (
     <div className="seg">
       <button className={view==='kanban'?'active':''} onClick={()=>setView('kanban')}><I.board /> Kanban</button>
       <button className={view==='list'?'active':''} onClick={()=>setView('list')}><I.list /> Lista</button>
     </div>
   );
-  return <PatientsView view={view} onOpenPatient={onOpenPatient} showOnlyActive={showOnlyActive} viewToggle={viewToggle} />;
+  return <PatientsView view={view} onOpenPatient={onOpenPatient} showOnlyActive={showOnlyActive} viewToggle={viewToggle} onNewPaciente={onNewPaciente} />;
 }
 
 function TestCatalogView() {
@@ -261,7 +354,238 @@ function TweaksPanel({ theme, setTheme, density, setDensity, onlyActive, setOnly
   );
 }
 
-Object.assign(window, { App, TweaksPanel, TestCatalogView, PatientsViewWithToggle });
+// ── Mapeamento DB → frontend ──────────────────────────────────
+function rowToPaciente(r) {
+  return {
+    id: r.id,
+    nome: r.nome,
+    idade: r.data_nasc ? Math.floor((new Date() - new Date(r.data_nasc)) / (365.25*24*3600*1000)) : 0,
+    dataNasc: r.data_nasc,
+    cpf: r.cpf || '***.***.***-**',
+    escolaridade: r.escolaridade || '—',
+    escola: r.escola || '—',
+    tipo: r.tipo || 'Adulto',
+    responsavel: r.responsavel || '—',
+    telefone: r.telefone || '—',
+    email: r.email || '—',
+    endereco: r.endereco || '—',
+    convenio: r.convenio || 'Particular',
+    encaminhadoPor: r.encaminhado_por || '—',
+    queixa: r.queixa || '—',
+    estagio: r.estagio || 'anamnese',
+    progresso: r.progresso || 0,
+    inicio: r.inicio,
+    previsaoLaudo: r.previsao_laudo,
+    ativo: r.ativo !== false,
+    corAvatar: r.cor_avatar || 'violet',
+    criadoEm: r.created_at?.slice(0,10),
+    diasNaEtapa: 0,
+    testes: [], sessoes: [], hipoteses: [],
+    anamnese: { completude: 0, secoes: {} },
+  };
+}
+function rowToCalendar(r) {
+  return {
+    pacId: r.paciente_id, id: r.id,
+    titulo: r.titulo, tipo: r.tipo,
+    data: r.data, hora: r.hora || '09:00',
+    duracao: r.duracao || 60,
+    notas: r.notas,
+  };
+}
+window.rowToPaciente = rowToPaciente;
+window.rowToCalendar = rowToCalendar;
+
+// ── Modal Novo Paciente ───────────────────────────────────────
+function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
+  const [form, setForm] = React.useState({
+    nome:'', tipo:'Criança', data_nasc:'', escolaridade:'', escola:'',
+    responsavel:'', telefone:'', email:'', convenio:'Particular',
+    encaminhado_por:'', queixa:'', cor_avatar:'violet',
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!form.nome.trim()) { setErr('Nome obrigatório'); return; }
+    setSaving(true); setErr('');
+    try {
+      const pac = await window.CORTEX_SB.createPaciente({
+        ...form,
+        inicio: new Date().toISOString().slice(0,10),
+        estagio: 'anamnese', progresso: 0, ativo: true,
+      }, profile.clinica_id, user.id);
+      window.CORTEX_DATA.PATIENTS = [rowToPaciente(pac), ...window.CORTEX_DATA.PATIENTS];
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      onSaved?.(pac);
+      onClose();
+    } catch(e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const inp = {width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'inherit', fontSize:13, outline:'none'};
+  const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(640px,100%)',maxHeight:'88vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h2 style={{margin:0,fontSize:18}}>Novo paciente</h2>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{gridColumn:'span 2'}}>
+            <label style={lbl}>Nome completo *</label>
+            <input value={form.nome} onChange={e=>set('nome',e.target.value)} style={inp} placeholder="Helena Ribeiro Campos" autoFocus />
+          </div>
+          <div>
+            <label style={lbl}>Tipo</label>
+            <select value={form.tipo} onChange={e=>set('tipo',e.target.value)} style={inp}>
+              {['Criança','Adolescente','Adulto','Idoso'].map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Data de nascimento</label>
+            <input type="date" value={form.data_nasc} onChange={e=>set('data_nasc',e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>Escolaridade</label>
+            <input value={form.escolaridade} onChange={e=>set('escolaridade',e.target.value)} style={inp} placeholder="4º ano EF" />
+          </div>
+          <div>
+            <label style={lbl}>Escola / Instituição</label>
+            <input value={form.escola} onChange={e=>set('escola',e.target.value)} style={inp} placeholder="Colégio Nova Era" />
+          </div>
+          <div>
+            <label style={lbl}>Responsável</label>
+            <input value={form.responsavel} onChange={e=>set('responsavel',e.target.value)} style={inp} placeholder="Nome (relação)" />
+          </div>
+          <div>
+            <label style={lbl}>Telefone</label>
+            <input value={form.telefone} onChange={e=>set('telefone',e.target.value)} style={inp} placeholder="(11) 98421-0022" />
+          </div>
+          <div>
+            <label style={lbl}>E-mail</label>
+            <input type="email" value={form.email} onChange={e=>set('email',e.target.value)} style={inp} placeholder="contato@email.com" />
+          </div>
+          <div>
+            <label style={lbl}>Convênio</label>
+            <input value={form.convenio} onChange={e=>set('convenio',e.target.value)} style={inp} placeholder="Particular" />
+          </div>
+          <div>
+            <label style={lbl}>Encaminhado por</label>
+            <input value={form.encaminhado_por} onChange={e=>set('encaminhado_por',e.target.value)} style={inp} placeholder="Dra. Sofia Lins" />
+          </div>
+          <div style={{gridColumn:'span 2'}}>
+            <label style={lbl}>Queixa principal</label>
+            <textarea value={form.queixa} onChange={e=>set('queixa',e.target.value)} rows={3} style={{...inp,resize:'vertical'}} placeholder="Descreva a queixa principal..." />
+          </div>
+        </div>
+
+        {err && <div style={{marginTop:12,padding:'9px 12px',borderRadius:8,background:'color-mix(in oklab,var(--danger) 12%,var(--surface))',color:'var(--danger)',fontSize:13}}>⚠ {err}</div>}
+
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:20}}>
+          <button type="button" onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            {saving ? 'Salvando...' : '+ Criar paciente'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── Modal Agendar Sessão ──────────────────────────────────────
+function ModalAgendarSessao({ pacientes, onClose, onSaved, profile, user, preselectedPacId }) {
+  const [form, setForm] = React.useState({
+    paciente_id: preselectedPacId || (pacientes[0]?.id || ''),
+    titulo:'', tipo:'Aplicação',
+    data: new Date().toISOString().slice(0,10),
+    hora:'09:00', duracao:60, notas:'',
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!form.paciente_id || !form.titulo.trim()) { setErr('Selecione o paciente e informe o título.'); return; }
+    setSaving(true); setErr('');
+    try {
+      const sessao = await window.CORTEX_SB.createSessao(form, profile.clinica_id, user.id);
+      window.CORTEX_DATA.CALENDAR = [...window.CORTEX_DATA.CALENDAR, rowToCalendar(sessao)];
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      onSaved?.(sessao);
+      onClose();
+    } catch(e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const inp = {width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'inherit', fontSize:13, outline:'none'};
+  const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h2 style={{margin:0,fontSize:18}}>Agendar sessão</h2>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{gridColumn:'span 2'}}>
+            <label style={lbl}>Paciente</label>
+            <select value={form.paciente_id} onChange={e=>set('paciente_id',e.target.value)} style={inp}>
+              {pacientes.map(p=><option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+          </div>
+          <div style={{gridColumn:'span 2'}}>
+            <label style={lbl}>Título da sessão</label>
+            <input value={form.titulo} onChange={e=>set('titulo',e.target.value)} style={inp} placeholder="Aplicação WISC-V" autoFocus />
+          </div>
+          <div>
+            <label style={lbl}>Tipo</label>
+            <select value={form.tipo} onChange={e=>set('tipo',e.target.value)} style={inp}>
+              {['Anamnese','Aplicação','Correção','Devolutiva','Laudo','Planejamento'].map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Duração (min)</label>
+            <input type="number" value={form.duracao} onChange={e=>set('duracao',+e.target.value)} style={inp} min={15} step={15} />
+          </div>
+          <div>
+            <label style={lbl}>Data</label>
+            <input type="date" value={form.data} onChange={e=>set('data',e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>Horário</label>
+            <input type="time" value={form.hora} onChange={e=>set('hora',e.target.value)} style={inp} />
+          </div>
+          <div style={{gridColumn:'span 2'}}>
+            <label style={lbl}>Observações</label>
+            <textarea value={form.notas} onChange={e=>set('notas',e.target.value)} rows={2} style={{...inp,resize:'vertical'}} />
+          </div>
+        </div>
+
+        {err && <div style={{marginTop:12,padding:'9px 12px',borderRadius:8,background:'color-mix(in oklab,var(--danger) 12%,var(--surface))',color:'var(--danger)',fontSize:13}}>⚠ {err}</div>}
+
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:20}}>
+          <button type="button" onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            {saving ? 'Salvando...' : '+ Agendar'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+Object.assign(window, { App, TweaksPanel, TestCatalogView, PatientsViewWithToggle, ModalNovoPaciente, ModalAgendarSessao, rowToPaciente, rowToCalendar });
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>

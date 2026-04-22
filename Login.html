@@ -296,6 +296,7 @@
     .visual { display: none; }
   }
 </style>
+  <script src="src/supabase.js"></script>
 </head>
 <body data-theme="dark">
 
@@ -399,28 +400,75 @@
     rem.classList.toggle('on', remCb.checked);
   });
 
-  // Form submit
+  // Form submit — autenticação real via Supabase
   const form = document.getElementById('loginForm');
   const errBox = document.getElementById('errorBox');
-  form.addEventListener('submit', (e) => {
+
+  function showError(msg) {
+    form.classList.add('shake');
+    errBox.innerHTML = `<div class="error-msg">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      ${msg}
+    </div>`;
+    setTimeout(() => form.classList.remove('shake'), 500);
+  }
+
+  // Checar se já está logado
+  const existing = window.CORTEX_SB?.sbSession?.();
+  if (existing?.access_token) { window.location.href = 'CORTEX.html'; }
+
+  // Toggle login/cadastro
+  let isSignup = false;
+  const footLink = document.querySelector('.foot a');
+  const formTitle = document.querySelector('.form-card h1');
+  const formSub   = document.querySelector('.form-card .sub');
+  const btnEl     = form.querySelector('.login-btn');
+
+  if (footLink) {
+    footLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      isSignup = !isSignup;
+      formTitle.textContent = isSignup ? 'Criar conta' : 'Bem-vinda de volta';
+      formSub.textContent   = isSignup ? 'Preencha seus dados para começar.' : 'Entre com suas credenciais para continuar.';
+      btnEl.childNodes[0].textContent = isSignup ? 'Criar conta ' : 'Entrar ';
+      footLink.textContent = isSignup ? 'Já tenho conta' : 'Solicitar acesso';
+      errBox.innerHTML = '';
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errBox.innerHTML = '';
     const email = document.getElementById('email').value.trim();
-    const pw = pass.value;
+    const pw    = pass.value;
+
     if (!email.includes('@') || pw.length < 4) {
-      form.classList.add('shake');
-      errBox.innerHTML = `<div class="error-msg">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Verifique seu e-mail e senha (mín. 4 caracteres).
-      </div>`;
-      setTimeout(() => form.classList.remove('shake'), 500);
+      showError('Verifique seu e-mail e senha (mín. 4 caracteres).');
       return;
     }
-    // "Entrando..." and redirect
-    const btn = form.querySelector('.login-btn');
-    btn.innerHTML = 'Entrando...';
-    btn.disabled = true;
-    setTimeout(() => { window.location.href = 'CORTEX.html'; }, 700);
+
+    btnEl.innerHTML   = isSignup ? 'Criando...' : 'Entrando...';
+    btnEl.disabled    = true;
+
+    try {
+      if (isSignup) {
+        await window.CORTEX_SB.cortexSignUp(email, pw, {
+          nome: email.split('@')[0],
+          clinica_nome: 'Minha Clínica',
+        });
+      } else {
+        await window.CORTEX_SB.cortexSignIn(email, pw);
+      }
+      window.location.href = 'CORTEX.html';
+    } catch (err) {
+      btnEl.innerHTML = isSignup ? 'Criar conta <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : 'Entrar <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
+      btnEl.disabled = false;
+      const msg = err.message.includes('Invalid login') ? 'E-mail ou senha incorretos.'
+                : err.message.includes('already registered') ? 'Este e-mail já está cadastrado.'
+                : err.message.includes('Email not confirmed') ? 'Confirme seu e-mail antes de entrar.'
+                : err.message;
+      showError(msg);
+    }
   });
 
   // Interactive neural trail on the visual panel

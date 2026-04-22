@@ -2,7 +2,7 @@
 // CORTEX — Pacientes views (List + Kanban)
 // ============================================================
 
-function PatientsView({ view, onOpenPatient, showOnlyActive, viewToggle }) {
+function PatientsView({ view, onOpenPatient, showOnlyActive, viewToggle, onNewPaciente }) {
   const { PATIENTS, STAGES } = window.CORTEX_DATA;
   const [q, setQ] = React.useState('');
   const [stageFilter, setStageFilter] = React.useState('all');
@@ -23,7 +23,7 @@ function PatientsView({ view, onOpenPatient, showOnlyActive, viewToggle }) {
         <div className="right">
           {viewToggle}
           <button className="ghost-btn"><I.filter /> Filtros</button>
-          <button className="primary-btn"><I.plus /> Novo paciente</button>
+          <button className="primary-btn" onClick={onNewPaciente}><I.plus /> Novo paciente</button>
         </div>
       </div>
 

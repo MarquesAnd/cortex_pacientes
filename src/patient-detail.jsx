@@ -2,7 +2,7 @@
 // CORTEX — Patient Detail view
 // ============================================================
 
-function PatientDetail({ patientId, onBack, onGoTo }) {
+function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
   const { PATIENTS, STAGES, TEST_CATALOG, TODAY } = window.CORTEX_DATA;
   const pac = PATIENTS.find(p => p.id === patientId);
   const [tab, setTab] = React.useState('anamnese');
@@ -48,7 +48,7 @@ function PatientDetail({ patientId, onBack, onGoTo }) {
         <div className="pd-actions">
           <button className="ghost-btn"><I.phone /> Contato</button>
           <button className="ghost-btn"><I.edit /> Editar</button>
-          <button className="primary-btn"><I.plus /> Agendar sessão</button>
+          <button className="primary-btn" onClick={() => onNewSessao?.(patientId)}><I.plus /> Agendar sessão</button>
         </div>
       </div>
 

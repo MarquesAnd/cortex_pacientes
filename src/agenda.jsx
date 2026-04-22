@@ -2,7 +2,7 @@
 // CORTEX — Agenda (week calendar view)
 // ============================================================
 
-function AgendaView({ onOpenPatient }) {
+function AgendaView({ onOpenPatient, onNewSessao }) {
   const { CALENDAR, PATIENTS, TODAY } = window.CORTEX_DATA;
 
   // Week starting on Monday that contains TODAY.
@@ -44,7 +44,7 @@ function AgendaView({ onOpenPatient }) {
           <button className="ghost-btn"><I.chevL /></button>
           <button className="ghost-btn">Hoje</button>
           <button className="ghost-btn"><I.chevR /></button>
-          <button className="primary-btn"><I.plus /> Sessão</button>
+          <button className="primary-btn" onClick={() => onNewSessao?.()}><I.plus /> Sessão</button>
         </div>
       </div>
 
