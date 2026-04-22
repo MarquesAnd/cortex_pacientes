@@ -180,6 +180,38 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
 }
 
 // ---- Anamnese --------------------------------------------------------
+// Componente separado para edição de seção da anamnese (hooks válidos)
+function AnamneseSecaoModal({ sec, dados, saving, onClose, onSave }) {
+  const [formSec, setFormSec] = React.useState(() =>
+    sec.fields.reduce((acc, f) => ({ ...acc, [f.key]: dados[f.key] || f.val || '' }), {})
+  );
+  const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,resize:'vertical',outline:'none'};
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h3 style={{margin:0}}>{sec.label}</h3>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        {sec.fields.map(f => (
+          <div key={f.key} style={{marginBottom:14}}>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--text-3)',marginBottom:6}}>{f.lbl}</label>
+            <textarea value={formSec[f.key] || ''} onChange={e => setFormSec(v => ({...v, [f.key]: e.target.value}))}
+              rows={3} style={inp} placeholder={`Preencha ${f.lbl.toLowerCase()}...`} />
+          </div>
+        ))}
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:4}}>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button onClick={() => onSave(sec.id, formSec)} disabled={saving}
+            style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            {saving ? 'Salvando...' : '✓ Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabAnamnese({ pac }) {
   const [editSecao, setEditSecao] = React.useState(null); // id da seção sendo editada
   const [dados, setDados] = React.useState(pac.anamnese?.dados || {});
@@ -275,42 +307,81 @@ function TabAnamnese({ pac }) {
         })}
       </div>
 
-      {/* Modal de edição de seção */}
-      {editSecao && (() => {
-        const sec = sections.find(s => s.id === editSecao);
-        const [formSec, setFormSec] = React.useState(() =>
-          sec.fields.reduce((acc, f) => ({ ...acc, [f.key]: dados[f.key] || f.val || '' }), {})
-        );
-        return (
-          <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={() => setEditSecao(null)}>
-            <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-                <h3 style={{margin:0}}>{sec.label}</h3>
-                <button onClick={() => setEditSecao(null)} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
-              </div>
-              {sec.fields.map(f => (
-                <div key={f.key} style={{marginBottom:14}}>
-                  <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--text-3)',marginBottom:6}}>{f.lbl}</label>
-                  <textarea value={formSec[f.key]} onChange={e => setFormSec(v => ({...v, [f.key]: e.target.value}))}
-                    rows={3} style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,resize:'vertical',outline:'none'}} />
-                </div>
-              ))}
-              <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-                <button onClick={() => setEditSecao(null)} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
-                <button onClick={() => saveSecao(editSecao, formSec)} disabled={saving}
-                  style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
-                  {saving ? 'Salvando...' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Modal de edição de seção — componente separado para respeitar regras de hooks */}
+      {editSecao && (
+        <AnamneseSecaoModal
+          sec={sections.find(s => s.id === editSecao)}
+          dados={dados}
+          saving={saving}
+          onClose={() => setEditSecao(null)}
+          onSave={(secId, formData) => saveSecao(secId, formData)}
+        />
+      )}
     </div>
   );
 }
 
 // ---- Hipóteses -------------------------------------------------------
+function HypModal({ hyp, onClose, onSave }) {
+  const [f, setF] = React.useState({
+    id: hyp?.id || null, titulo: hyp?.titulo || '', status: hyp?.status || 'em-investigacao',
+    peso: hyp?.peso ?? 2, evidencias: hyp?.evidencias || [],
+  });
+  const [novaEvid, setNovaEvid] = React.useState('');
+  const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'};
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h3 style={{margin:0}}>{f.id ? 'Editar hipótese' : 'Nova hipótese'}</h3>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{marginBottom:14}}>
+          <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Hipótese diagnóstica</label>
+          <input value={f.titulo} onChange={e=>setF(v=>({...v,titulo:e.target.value}))} style={inp} placeholder="Ex: TDAH — Apresentação Combinada" autoFocus />
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Status</label>
+            <select value={f.status} onChange={e=>setF(v=>({...v,status:e.target.value}))} style={inp}>
+              <option value="em-investigacao">Em investigação</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="descartada">Descartada</option>
+            </select>
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Peso clínico (0–3)</label>
+            <input type="number" min={0} max={3} value={f.peso} onChange={e=>setF(v=>({...v,peso:e.target.value}))} style={inp} />
+          </div>
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Evidências</label>
+          <div style={{display:'flex',gap:8,marginBottom:8}}>
+            <input value={novaEvid} onChange={e=>setNovaEvid(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
+              style={inp} placeholder="Ex: WISC-IV: FDI baixo (Enter para adicionar)" />
+            <button onClick={()=>{if(novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
+              style={{padding:'9px 14px',borderRadius:8,border:'none',background:'var(--teal-500)',color:'white',cursor:'pointer',whiteSpace:'nowrap',fontSize:13}}>+</button>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {f.evidencias.map((e,i) => (
+              <span key={i} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:999,background:'var(--surface-2)',border:'1px solid var(--border)',fontSize:12}}>
+                {e}<button onClick={()=>setF(v=>({...v,evidencias:v.evidencias.filter((_,j)=>j!==i)}))} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:0,fontSize:14,lineHeight:1}}>✕</button>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button onClick={()=>onSave(f)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            {f.id ? 'Salvar' : 'Criar hipótese'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabHipoteses({ pac }) {
   const statusLabel = { 'em-investigacao':'Em investigação', 'confirmada':'Confirmada', 'descartada':'Descartada' };
   const [hyps, setHyps] = React.useState(pac.hipoteses || []);
@@ -342,66 +413,6 @@ function TabHipoteses({ pac }) {
     if (!confirm('Remover esta hipótese?')) return;
     await window.CORTEX_SB.deleteHipotese(id).catch(()=>{});
     syncLocal(hyps.filter(h => h.id !== id));
-  };
-
-  const HypModal = ({ hyp, onClose, onSave }) => {
-    const [f, setF] = React.useState({
-      id: hyp?.id || null, titulo: hyp?.titulo || '', status: hyp?.status || 'em-investigacao',
-      peso: hyp?.peso ?? 2, evidencias: hyp?.evidencias || [],
-    });
-    const [novaEvid, setNovaEvid] = React.useState('');
-    const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'};
-    return (
-      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-            <h3 style={{margin:0}}>{f.id ? 'Editar hipótese' : 'Nova hipótese'}</h3>
-            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
-          </div>
-          <div style={{marginBottom:14}}>
-            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Hipótese diagnóstica</label>
-            <input value={f.titulo} onChange={e=>setF(v=>({...v,titulo:e.target.value}))} style={inp} placeholder="Ex: TDAH — Apresentação Combinada" autoFocus />
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-            <div>
-              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Status</label>
-              <select value={f.status} onChange={e=>setF(v=>({...v,status:e.target.value}))} style={inp}>
-                <option value="em-investigacao">Em investigação</option>
-                <option value="confirmada">Confirmada</option>
-                <option value="descartada">Descartada</option>
-              </select>
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Peso clínico (0–3)</label>
-              <input type="number" min={0} max={3} value={f.peso} onChange={e=>setF(v=>({...v,peso:e.target.value}))} style={inp} />
-            </div>
-          </div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Evidências</label>
-            <div style={{display:'flex',gap:8,marginBottom:8}}>
-              <input value={novaEvid} onChange={e=>setNovaEvid(e.target.value)}
-                onKeyDown={e=>{if(e.key==='Enter'&&novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
-                style={inp} placeholder="Ex: WISC-IV: FDI baixo (Enter para adicionar)" />
-              <button onClick={()=>{if(novaEvid.trim()){setF(v=>({...v,evidencias:[...v.evidencias,novaEvid.trim()]}));setNovaEvid('');}}}
-                style={{padding:'9px 14px',borderRadius:8,border:'none',background:'var(--teal-500)',color:'white',cursor:'pointer',whiteSpace:'nowrap',fontSize:13}}>+</button>
-            </div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {f.evidencias.map((e,i) => (
-                <span key={i} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:999,background:'var(--surface-2)',border:'1px solid var(--border)',fontSize:12}}>
-                  {e}<button onClick={()=>setF(v=>({...v,evidencias:v.evidencias.filter((_,j)=>j!==i)}))} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:0,fontSize:14,lineHeight:1}}>✕</button>
-                </span>
-              ))}
-            </div>
-          </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
-            <button onClick={()=>onSave(f)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
-              {f.id ? 'Salvar' : 'Criar hipótese'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -470,6 +481,72 @@ function TabEscolar({ pac }) {
 }
 
 // ---- Bateria de testes ----------------------------------------------
+function RegistrarModal({ teste, onClose, onConfirm }) {
+  const [data, setData] = React.useState(new Date().toISOString().slice(0,10));
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(420px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+        <h3 style={{margin:'0 0 20px'}}>Registrar aplicação</h3>
+        <div style={{fontWeight:600,marginBottom:16,fontSize:14}}>{teste.name}</div>
+        <div style={{marginBottom:20}}>
+          <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Data de aplicação</label>
+          <input type="date" value={data} onChange={e=>setData(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}} />
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
+          <button onClick={()=>onConfirm(data)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            ✓ Confirmar aplicação
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdicionarTesteModal({ onClose, jaAdicionados, onAdicionar }) {
+  const [q, setQ] = React.useState('');
+  const [sel, setSel] = React.useState('');
+  const [prevista, setPrevista] = React.useState('');
+  const { TEST_CATALOG } = window.CORTEX_DATA;
+  const todos = Object.entries(TEST_CATALOG).flatMap(([cat, ts]) => ts.map(t => ({...t, cat})));
+  const filtrados = todos.filter(t => !jaAdicionados.has(t.id) && (!q || t.name.toLowerCase().includes(q.toLowerCase()) || t.avalia?.toLowerCase().includes(q.toLowerCase())));
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3 style={{margin:0}}>Adicionar instrumento</h3>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar instrumento..." autoFocus style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',marginBottom:12}} />
+        <div style={{flex:1,overflowY:'auto',marginBottom:16,border:'1px solid var(--border)',borderRadius:8}}>
+          {filtrados.slice(0,40).map(t => (
+            <div key={t.id} onClick={()=>setSel(t.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid var(--border)',background: sel===t.id ? 'var(--surface-2)' : 'transparent'}}>
+              <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel===t.id ? 'var(--teal-500)' : 'var(--border)'}`,background: sel===t.id ? 'var(--teal-500)' : 'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
+                {sel===t.id && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13}}>{t.name}</div>
+                <div style={{fontSize:11,color:'var(--text-3)'}}>{t.avalia} · {t.faixa}</div>
+              </div>
+            </div>
+          ))}
+          {filtrados.length === 0 && <div style={{padding:20,textAlign:'center',color:'var(--text-3)',fontSize:13}}>Nenhum instrumento encontrado</div>}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{flex:1}}>
+            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:4}}>Data prevista</label>
+            <input type="date" value={prevista} onChange={e=>setPrevista(e.target.value)} style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}} />
+          </div>
+          <button onClick={()=>sel && onAdicionar(sel, prevista)} disabled={!sel}
+            style={{padding:'10px 20px',borderRadius:8,border:'none',background:sel?'linear-gradient(135deg,var(--teal-500),var(--pink-500))':'var(--border)',color:'white',fontWeight:600,cursor:sel?'pointer':'not-allowed',fontSize:13,marginTop:20,whiteSpace:'nowrap'}}>
+            + Adicionar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabBateria({ pac }) {
   const { TEST_CATALOG, TODAY } = window.CORTEX_DATA;
   const testes = pac.testes || [];
@@ -532,77 +609,14 @@ function TabBateria({ pac }) {
   const catsLocal = Object.keys(byCatLocal);
   const doneLocal = localTestes.filter(t => t.status === 'aplicado').length;
 
-  // Modal registrar aplicação
-  const RegistrarModal = ({ teste, onClose }) => {
-    const [data, setData] = React.useState(new Date().toISOString().slice(0,10));
-    return (
-      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(420px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
-          <h3 style={{margin:'0 0 20px'}}>Registrar aplicação</h3>
-          <div style={{fontWeight:600,marginBottom:16,fontSize:14}}>{teste.name}</div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Data de aplicação</label>
-            <input type="date" value={data} onChange={e=>setData(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}} />
-          </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
-            <button onClick={()=>registrarAplicacao(teste,data)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
-              ✓ Confirmar aplicação
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  // Modal adicionar teste
-  const AdicionarTesteModal = ({ onClose }) => {
-    const [q, setQ] = React.useState('');
-    const [sel, setSel] = React.useState('');
-    const [prevista, setPrevista] = React.useState('');
-    const jaAdicionados = new Set(localTestes.map(t => t.id));
-    const todos = Object.entries(TEST_CATALOG).flatMap(([cat, ts]) => ts.map(t => ({...t, cat})));
-    const filtrados = todos.filter(t => !jaAdicionados.has(t.id) && (!q || t.name.toLowerCase().includes(q.toLowerCase()) || t.avalia?.toLowerCase().includes(q.toLowerCase())));
-    return (
-      <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-        <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-            <h3 style={{margin:0}}>Adicionar instrumento</h3>
-            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
-          </div>
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar instrumento..." style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',marginBottom:12}} />
-          <div style={{flex:1,overflowY:'auto',marginBottom:16,border:'1px solid var(--border)',borderRadius:8}}>
-            {filtrados.slice(0,40).map(t => (
-              <div key={t.id} onClick={()=>setSel(t.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid var(--border)',background: sel===t.id ? 'var(--surface-2)' : 'transparent'}}>
-                <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel===t.id ? 'var(--teal-500)' : 'var(--border)'}`,background: sel===t.id ? 'var(--teal-500)' : 'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
-                  {sel===t.id && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:600,fontSize:13}}>{t.name}</div>
-                  <div style={{fontSize:11,color:'var(--text-3)'}}>{t.avalia} · {t.faixa}</div>
-                </div>
-              </div>
-            ))}
-            {filtrados.length === 0 && <div style={{padding:20,textAlign:'center',color:'var(--text-3)',fontSize:13}}>Nenhum instrumento encontrado</div>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{flex:1}}>
-              <label style={{display:'block',fontSize:11,fontWeight:600,textTransform:'uppercase',color:'var(--text-3)',marginBottom:4}}>Data prevista</label>
-              <input type="date" value={prevista} onChange={e=>setPrevista(e.target.value)} style={{width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}} />
-            </div>
-            <button onClick={()=>sel && adicionarTeste(sel, prevista)} disabled={!sel} style={{padding:'10px 20px',borderRadius:8,border:'none',background: sel ? 'linear-gradient(135deg,var(--teal-500),var(--pink-500))' : 'var(--border)',color:'white',fontWeight:600,cursor: sel ? 'pointer' : 'not-allowed',fontSize:13,marginTop:20,whiteSpace:'nowrap'}}>
-              + Adicionar
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+
+
 
   if (localTestes.length === 0) {
     return (
       <>
-        {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} />}
+        {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} jaAdicionados={new Set(localTestes.map(t => t.id))} onAdicionar={adicionarTeste} />}
         <div className="card" style={{textAlign:'center', padding: 40}}>
           <I.flask style={{width:32, height:32, color:'var(--text-3)', margin:'0 auto'}} />
           <h3 style={{marginTop:12}}>Bateria ainda não montada</h3>
@@ -615,8 +629,8 @@ function TabBateria({ pac }) {
 
   return (
     <>
-      {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} />}
-      {registrando && <RegistrarModal teste={registrando} onClose={() => setRegistrando(null)} />}
+      {showAddModal && <AdicionarTesteModal onClose={() => setShowAddModal(false)} jaAdicionados={new Set(localTestes.map(t => t.id))} onAdicionar={adicionarTeste} />}
+      {registrando && <RegistrarModal teste={registrando} onClose={() => setRegistrando(null)} onConfirm={(data) => registrarAplicacao(registrando, data)} />}
       <div>
         <div style={{display:'flex', gap:14, alignItems:'center', marginBottom:14}}>
           <strong style={{fontSize: 14}}>{doneLocal} de {localTestes.length} aplicados</strong>
