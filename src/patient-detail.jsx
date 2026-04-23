@@ -8,6 +8,24 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
   const [tab, setTab] = React.useState('anamnese');
   const [editando, setEditando] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [avancando, setAvancando] = React.useState(false);
+
+  const avancarEtapa = async () => {
+    const stages = window.CORTEX_DATA.STAGES;
+    const curIdx = stages.findIndex(s => s.id === pac.estagio);
+    if (curIdx < 0 || curIdx >= stages.length - 1) return;
+    const proxEtapa = stages[curIdx + 1];
+    setAvancando(true);
+    try {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pac.id);
+      if (isUUID) await window.CORTEX_SB.updatePaciente(pac.id, { estagio: proxEtapa.id });
+      const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+      if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].estagio = proxEtapa.id;
+      pac.estagio = proxEtapa.id;
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+    } catch(e) { alert('Erro: ' + e.message); }
+    finally { setAvancando(false); }
+  };
 
   const deletarPaciente = async () => {
     try {
@@ -106,6 +124,29 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
             onMouseLeave={e=>{e.currentTarget.style.background=''}}>
             <I.trash style={{width:14,height:14}} /> Deletar
           </button>
+          {(() => {
+            const stages = window.CORTEX_DATA.STAGES;
+            const curIdx = stages.findIndex(s => s.id === pac.estagio);
+            const proxima = stages[curIdx + 1];
+            if (!proxima) return null;
+            return (
+              <button
+                onClick={avancarEtapa}
+                disabled={avancando}
+                style={{
+                  display:'inline-flex', alignItems:'center', gap:6,
+                  padding:'8px 16px', borderRadius:8, border:'none',
+                  background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                  color:'white', fontWeight:600, fontSize:13, cursor:'pointer',
+                  opacity: avancando ? 0.7 : 1,
+                }}
+                onMouseEnter={e=>{ if(!avancando) e.currentTarget.style.filter='brightness(1.1)'; }}
+                onMouseLeave={e=>{ e.currentTarget.style.filter=''; }}
+              >
+                {avancando ? '...' : <>→ {proxima.label}</>}
+              </button>
+            );
+          })()}
           <button className="primary-btn" onClick={() => onNewSessao?.(patientId)}><I.plus /> Agendar sessão</button>
         </div>
       </div>
