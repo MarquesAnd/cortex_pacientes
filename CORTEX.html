@@ -163,8 +163,6 @@ function App() {
     } catch(e) { console.warn('recarregarPaciente', e); }
   };
 
-  };
-
   // Data update listener
   React.useEffect(() => {
     window.addEventListener('cortex-data-updated', tick);
