@@ -847,6 +847,7 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
     data_nasc: pac.dataNasc || '',
     escolaridade: pac.escolaridade || '',
     escola: pac.escola || '',
+    cpf: pac.cpf || '',
     responsavel: pac.responsavel || '',
     telefone: pac.telefone || '',
     email: pac.email || '',
@@ -868,6 +869,8 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
     setSaving(true); setErr('');
     try {
       const patch = { ...form };
+      // Garantir cpf no patch
+      if (!patch.cpf) patch.cpf = null;
       if (fotoUrl !== (pac.avatar_url || null)) patch.avatar_url = fotoUrl;
       // Limpar campos de data vazios — Supabase não aceita string vazia em campos date
       if (!patch.data_nasc)      patch.data_nasc      = null;
@@ -877,7 +880,7 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
       const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
       if (idx >= 0) {
         window.CORTEX_DATA.PATIENTS[idx] = { ...window.CORTEX_DATA.PATIENTS[idx],
-          nome: form.nome, tipo: form.tipo, dataNasc: form.data_nasc,
+          nome: form.nome, tipo: form.tipo, dataNasc: form.data_nasc, cpf: form.cpf,
           escolaridade: form.escolaridade, escola: form.escola,
           responsavel: form.responsavel, telefone: form.telefone,
           email: form.email, convenio: form.convenio,

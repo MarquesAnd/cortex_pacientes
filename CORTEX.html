@@ -511,7 +511,7 @@ window.rowToCalendar = rowToCalendar;
 function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
   const [form, setForm] = React.useState({
     nome:'', tipo:'Criança', data_nasc:'', escolaridade:'', escola:'',
-    responsavel:'', telefone:'', email:'', convenio:'Particular',
+    cpf:'', responsavel:'', telefone:'', email:'', convenio:'Particular',
     encaminhado_por:'', queixa:'', cor_avatar:'violet',
   });
   const [saving, setSaving] = React.useState(false);
@@ -585,6 +585,10 @@ function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
           <div>
             <label style={lbl}>E-mail</label>
             <input type="email" value={form.email} onChange={e=>set('email',e.target.value)} style={inp} placeholder="contato@email.com" />
+          </div>
+          <div>
+            <label style={lbl}>CPF</label>
+            <input value={form.cpf} onChange={e=>set('cpf',e.target.value)} style={inp} placeholder="000.000.000-00" />
           </div>
           <div>
             <label style={lbl}>Convênio</label>
