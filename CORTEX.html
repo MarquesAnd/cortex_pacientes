@@ -508,8 +508,8 @@ function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
   const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(640px,100%)',maxHeight:'88vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <form onSubmit={save} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(640px,100%)',maxHeight:'88vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h2 style={{margin:0,fontSize:18}}>Novo paciente</h2>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
@@ -608,8 +608,8 @@ function ModalAgendarSessao({ pacientes, onClose, onSaved, profile, user, presel
   const lbl = {display:'block', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-3)', marginBottom:5};
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <form onSubmit={save} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.4)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h2 style={{margin:0,fontSize:18}}>Agendar sessão</h2>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>

@@ -187,8 +187,8 @@ function AnamneseSecaoModal({ sec, dados, saving, onClose, onSave }) {
   );
   const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,resize:'vertical',outline:'none'};
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <div style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h3 style={{margin:0}}>{sec.label}</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
@@ -330,8 +330,8 @@ function HypModal({ hyp, onClose, onSave }) {
   const [novaEvid, setNovaEvid] = React.useState('');
   const inp = {width:'100%',padding:'9px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'};
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <div style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h3 style={{margin:0}}>{f.id ? 'Editar hipótese' : 'Nova hipótese'}</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
@@ -522,7 +522,7 @@ function TabEscolar({ pac, onNewSessao }) {
 
       {showAnotacao && (
         <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={() => setShowAnotacao(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+          <div style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(520px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
               <h3 style={{margin:0}}>Anotação clínica</h3>
               <button onClick={() => setShowAnotacao(false)} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
@@ -547,8 +547,8 @@ function TabEscolar({ pac, onNewSessao }) {
 function RegistrarModal({ teste, onClose, onConfirm }) {
   const [data, setData] = React.useState(new Date().toISOString().slice(0,10));
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(420px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <div style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(420px,100%)',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
         <h3 style={{margin:'0 0 20px'}}>Registrar aplicação</h3>
         <div style={{fontWeight:600,marginBottom:16,fontSize:14}}>{teste.name}</div>
         <div style={{marginBottom:20}}>
@@ -574,8 +574,8 @@ function AdicionarTesteModal({ onClose, jaAdicionados, onAdicionar }) {
   const todos = Object.entries(TEST_CATALOG).flatMap(([cat, ts]) => ts.map(t => ({...t, cat})));
   const filtrados = todos.filter(t => !jaAdicionados.has(t.id) && (!q || t.name.toLowerCase().includes(q.toLowerCase()) || t.avalia?.toLowerCase().includes(q.toLowerCase())));
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <div style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(560px,100%)',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
           <h3 style={{margin:0}}>Adicionar instrumento</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
@@ -857,8 +857,8 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
   const convenioOpts = window.getConveniosAtivos?.() || ['Particular','Unimed','Bradesco Saúde','Amil','Hapvida'];
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}} onClick={onClose}>
-      <form onSubmit={save} onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(680px,100%)',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',padding:24}}>
+      <form onSubmit={save} style={{background:'var(--surface)',borderRadius:16,padding:28,width:'min(680px,100%)',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 24px 60px rgba(0,0,0,0.5)',border:'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h2 style={{margin:0,fontSize:18}}>Editar paciente</h2>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',fontSize:20,cursor:'pointer'}}>✕</button>
@@ -902,7 +902,7 @@ function ModalEditarPaciente({ pac, onClose, onSaved }) {
           </div>
         </div>
         {err && <div style={{marginTop:12,padding:'9px 12px',borderRadius:8,background:'color-mix(in oklab,var(--danger) 12%,var(--surface))',color:'var(--danger)',fontSize:13}}>⚠ {err}</div>}
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:20}}>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:20,position:'sticky',bottom:0,background:'var(--surface)',paddingTop:12,paddingBottom:4,borderTop:'1px solid var(--border)'}}>
           <button type="button" onClick={onClose} style={{padding:'10px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--surface-2)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancelar</button>
           <button type="submit" disabled={saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,var(--teal-500),var(--pink-500))',color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>
             {saving ? 'Salvando...' : 'Salvar alterações'}
