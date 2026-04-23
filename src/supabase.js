@@ -27,10 +27,45 @@ function sbHeaders(extra = {}) {
   };
 }
 async function sbRest(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+  const makeReq = (token) => fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...opts,
-    headers: { ...sbHeaders(opts.prefer ? { Prefer: opts.prefer } : {}), ...(opts.headers || {}) },
+    headers: {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(opts.prefer ? { Prefer: opts.prefer } : {}),
+      ...(opts.headers || {}),
+    },
   });
+
+  let sess = sbSession();
+  let res = await makeReq(sess?.access_token || SUPABASE_ANON);
+
+  // Se 401, tentar renovar o token com refresh_token
+  if (res.status === 401 && sess?.refresh_token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sess.refresh_token }),
+      });
+      if (r.ok) {
+        const newSess = await r.json();
+        sbSetSession(newSess);
+        res = await makeReq(newSess.access_token);
+      } else {
+        // Refresh falhou — redirecionar para login
+        sbSetSession(null);
+        window.location.replace('Login.html');
+        return;
+      }
+    } catch(e) {
+      sbSetSession(null);
+      window.location.replace('Login.html');
+      return;
+    }
+  }
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Supabase ${res.status}: ${err}`);
@@ -103,9 +138,18 @@ async function createPaciente(data, clinicaId, userId) {
   return rows[0];
 }
 async function updatePaciente(id, patch) {
+  // Campos válidos da tabela pacientes — filtrar para não enviar campos do frontend
+  const CAMPOS_VALIDOS = ['nome','tipo','data_nasc','cpf','genero','escolaridade',
+    'escola','responsavel','telefone','email','endereco','convenio','encaminhado_por',
+    'queixa','estagio','progresso','inicio','previsao_laudo','ativo','cor_avatar','avatar_url'];
+  const patchLimpo = {};
+  for (const k of CAMPOS_VALIDOS) {
+    if (k in patch) patchLimpo[k] = patch[k];
+  }
+  patchLimpo.updated_at = new Date().toISOString();
   return sbRest(`/pacientes?id=eq.${id}`, {
     method: 'PATCH', prefer: 'return=representation',
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    body: JSON.stringify(patchLimpo),
   });
 }
 async function deletePaciente(id) {
