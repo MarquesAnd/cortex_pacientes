@@ -127,4 +127,4 @@ const CALENDAR = [];
 // Pacientes carregados do Supabase via hydratePacientes()
 const PATIENTS = [];
 
-window.CORTEX_DATA = { TEST_CATALOG, STAGES, TODAY, PATIENTS, CALENDAR };
+window.CORTEX_DATA = { TEST_CATALOG, STAGES, TODAY, PATIENTS, CALENDAR, clinica: null, convenios: [], etapas: [] };

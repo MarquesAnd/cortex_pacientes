@@ -121,8 +121,14 @@ async function cortexGetProfile(userId) {
   return rows[0] || null;
 }
 async function cortexUpdateProfile(userId, patch) {
+  // Campos válidos da tabela profiles
+  const CAMPOS = ['nome','email','especialidade','avatar_url','crp','telefone','clinica_id','role'];
+  const patchLimpo = {};
+  for (const k of CAMPOS) {
+    if (k in patch) patchLimpo[k] = patch[k];
+  }
   return sbRest(`/profiles?id=eq.${userId}`, {
-    method: 'PATCH', body: JSON.stringify(patch), prefer: 'return=representation',
+    method: 'PATCH', body: JSON.stringify(patchLimpo), prefer: 'return=representation',
   });
 }
 
