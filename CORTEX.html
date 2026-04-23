@@ -511,7 +511,7 @@ window.rowToCalendar = rowToCalendar;
 function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
   const [form, setForm] = React.useState({
     nome:'', tipo:'Criança', data_nasc:'', escolaridade:'', escola:'',
-    cpf:'', responsavel:'', telefone:'', email:'', convenio:'Particular',
+    cpf:'', responsavel:'', telefone:'', email:'', convenio: window.getConveniosAtivos?.()[0] || 'Particular',
     encaminhado_por:'', queixa:'', cor_avatar:'violet',
   });
   const [saving, setSaving] = React.useState(false);
@@ -592,7 +592,11 @@ function ModalNovoPaciente({ onClose, onSaved, profile, user }) {
           </div>
           <div>
             <label style={lbl}>Convênio</label>
-            <input value={form.convenio} onChange={e=>set('convenio',e.target.value)} style={inp} placeholder="Particular" />
+            <select value={form.convenio} onChange={e=>set('convenio',e.target.value)} style={inp}>
+              {(window.getConveniosAtivos?.() || ['Particular']).map(nome => (
+                <option key={nome} value={nome}>{nome}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label style={lbl}>Encaminhado por</label>
