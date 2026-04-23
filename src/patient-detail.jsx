@@ -267,6 +267,7 @@ function TabAnamnese({ pac }) {
       setDados(updatedDados);
       const idx = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
       if (idx >= 0) window.CORTEX_DATA.PATIENTS[idx].anamnese = { completude, secoes: updatedSecoes, dados: updatedDados };
+      window.recarregarPaciente?.(pac.id);
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
       setEditSecao(null);
     } catch(e) { alert('Erro ao salvar: ' + e.message); }
@@ -405,6 +406,7 @@ function TabHipoteses({ pac }) {
         const saved = await window.CORTEX_SB.createHipotese({ paciente_id: pac.id, titulo: form.titulo, status: form.status, peso: +form.peso, evidencias: form.evidencias }, clinicaId);
         syncLocal([...hyps, saved]);
       }
+      window.recarregarPaciente?.(pac.id);
       setShowModal(false); setEditHyp(null);
     } catch(e) { alert('Erro: ' + e.message); }
   };
@@ -643,6 +645,7 @@ function TabBateria({ pac }) {
         await window.CORTEX_SB.updateTestePaciente(teste.dbId, patch);
       }
       syncTestes(localTestes.map(t => t.id === teste.id ? {...t, ...patch} : t));
+      await window.recarregarPaciente?.(pac.id);
       setRegistrando(null);
     } catch(e) { alert('Erro: ' + e.message); }
   };

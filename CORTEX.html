@@ -39,13 +39,13 @@
   })();
 </script>
 
-<script src="src/supabase.js"></script>
-<script src="src/data.js"></script>
-<script type="text/babel" src="src/ui.jsx"></script>
-<script type="text/babel" src="src/dashboard.jsx"></script>
-<script type="text/babel" src="src/patients.jsx"></script>
-<script type="text/babel" src="src/agenda.jsx"></script>
-<script type="text/babel" src="src/patient-detail.jsx"></script>
+<script src="src/supabase.js?v=202604231347"></script>
+<script src="src/data.js?v=202604231347"></script>
+<script type="text/babel" src="src/ui.jsx?v=202604231347"></script>
+<script type="text/babel" src="src/dashboard.jsx?v=202604231347"></script>
+<script type="text/babel" src="src/patients.jsx?v=202604231347"></script>
+<script type="text/babel" src="src/agenda.jsx?v=202604231347"></script>
+<script type="text/babel" src="src/patient-detail.jsx?v=202604231347"></script>
 
 <script type="text/babel">
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -104,46 +104,38 @@ function App() {
   }, []);
 
   // Data hydrate
+  // Injetar dados clínicos em um paciente via fetches individuais
+  const injetarDadosClinicos = async (pac) => {
+    try {
+      const [anam, hips, tests] = await Promise.all([
+        window.CORTEX_SB.fetchAnamnese(pac.id).catch(() => null),
+        window.CORTEX_SB.fetchHipoteses(pac.id).catch(() => []),
+        window.CORTEX_SB.fetchTestesPaciente(pac.id).catch(() => []),
+      ]);
+      if (anam) pac.anamnese = { completude: anam.completude || 0, secoes: anam.secoes || {}, dados: anam.dados || {} };
+      pac.hipoteses = (hips || []).map(h => ({ id: h.id, titulo: h.titulo, status: h.status, peso: h.peso, evidencias: h.evidencias || [] }));
+      pac.testes = (tests || []).map(t => ({ id: t.teste_id, dbId: t.id, status: t.status, prevista: t.prevista, aplicada: t.aplicada, obs: t.obs }));
+    } catch(e) { console.warn('injetarDadosClinicos', e); }
+  };
+
   const hydratePacientes = async (clinicaId) => {
     try {
-      const [pacs, sess, clinica, clinicos] = await Promise.all([
+      const [pacs, sess, clinica] = await Promise.all([
         window.CORTEX_SB.fetchPacientes(clinicaId),
         window.CORTEX_SB.fetchSessoes(clinicaId),
         window.CORTEX_SB.fetchClinica(clinicaId),
-        window.CORTEX_SB.fetchTodosDadosClinicos(clinicaId),
       ]);
 
       if (pacs && pacs.length > 0) {
         window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
+        // Carregar dados clínicos de todos em paralelo
+        await Promise.all(window.CORTEX_DATA.PATIENTS.map(injetarDadosClinicos));
       }
 
-      // Injetar anamneses, hipóteses e testes em cada paciente
-      if (clinicos) {
-        const { anamneses, hipoteses, testes } = clinicos;
+      // Agenda — mesmo vazia, zerar o CALENDAR para não mostrar dados antigos
+      window.CORTEX_DATA.CALENDAR = (sess || []).map(rowToCalendar);
 
-        window.CORTEX_DATA.PATIENTS.forEach(pac => {
-          // Anamnese
-          const anam = anamneses.find(a => a.paciente_id === pac.id);
-          if (anam) {
-            pac.anamnese = { completude: anam.completude || 0, secoes: anam.secoes || {}, dados: anam.dados || {} };
-          }
-
-          // Hipóteses
-          pac.hipoteses = hipoteses
-            .filter(h => h.paciente_id === pac.id)
-            .map(h => ({ id: h.id, titulo: h.titulo, status: h.status, peso: h.peso, evidencias: h.evidencias || [] }));
-
-          // Testes
-          pac.testes = testes
-            .filter(t => t.paciente_id === pac.id)
-            .map(t => ({ id: t.teste_id, dbId: t.id, status: t.status, prevista: t.prevista, aplicada: t.aplicada, obs: t.obs }));
-        });
-      }
-
-      if (sess && sess.length > 0) window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
-
-      // Cachear config da clínica no localStorage para uso offline/rápido
-      // Guardar clinica globalmente — fonte de verdade para convênios, etapas etc.
+      // Config da clínica em memória
       if (clinica) {
         window.CORTEX_DATA.clinica = clinica;
         window.CORTEX_DATA.convenios = clinica.convenios || [];
@@ -153,6 +145,24 @@ function App() {
 
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
     } catch (e) { console.warn('hydratePacientes', e); }
+  };
+
+  // Recarregar dados de um paciente após edição — garante lista atualizada
+  window.recarregarPaciente = async (pacId) => {
+    if (!window._clinicaId || !pacId) return;
+    try {
+      const [pacRows, sessoes] = await Promise.all([
+        window.CORTEX_SB.fetchPacientes(window._clinicaId),
+        window.CORTEX_SB.fetchSessoesPaciente(pacId).catch(() => []),
+      ]);
+      if (pacRows) window.CORTEX_DATA.PATIENTS = pacRows.map(rowToPaciente);
+      await Promise.all(window.CORTEX_DATA.PATIENTS.map(injetarDadosClinicos));
+      const outras = window.CORTEX_DATA.CALENDAR.filter(s => s.pacId !== pacId);
+      window.CORTEX_DATA.CALENDAR = [...outras, ...(sessoes || []).map(rowToCalendar)];
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+    } catch(e) { console.warn('recarregarPaciente', e); }
+  };
+
   };
 
   // Data update listener
@@ -625,7 +635,10 @@ function ModalAgendarSessao({ pacientes, onClose, onSaved, profile, user, presel
     try {
       const sessao = await window.CORTEX_SB.createSessao(form, profile.clinica_id, user.id);
       window.CORTEX_DATA.CALENDAR = [...window.CORTEX_DATA.CALENDAR, rowToCalendar(sessao)];
-      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      // Recarregar sessões do banco para garantir consistência
+      window.CORTEX_SB.fetchSessoes(profile.clinica_id)
+        .then(sess => { if (sess) window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar); window.dispatchEvent(new CustomEvent('cortex-data-updated')); })
+        .catch(() => window.dispatchEvent(new CustomEvent('cortex-data-updated')));
       onSaved?.(sessao);
       onClose();
     } catch(e) { setErr(e.message); }
