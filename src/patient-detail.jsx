@@ -27,6 +27,27 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
     finally { setAvancando(false); }
   };
 
+  // ── CPF Prompt ───────────────────────────────────────────
+  const cpfAusente = !pac.cpf || pac.cpf === '***.***.***-**' || pac.cpf === '—' || pac.cpf.trim() === '';
+  const [showCpfPrompt, setShowCpfPrompt] = React.useState(cpfAusente);
+  const [cpfInput, setCpfInput] = React.useState('');
+  const [savingCpf, setSavingCpf] = React.useState(false);
+
+  const salvarCpf = async () => {
+    if (!cpfInput.trim()) return;
+    setSavingCpf(true);
+    try {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pac.id);
+      if (isUUID) await window.CORTEX_SB.updatePaciente(pac.id, { cpf: cpfInput.trim() });
+      pac.cpf = cpfInput.trim();
+      const idx2 = window.CORTEX_DATA.PATIENTS.findIndex(p => p.id === pac.id);
+      if (idx2 >= 0) window.CORTEX_DATA.PATIENTS[idx2].cpf = cpfInput.trim();
+      window.dispatchEvent(new CustomEvent('cortex-data-updated'));
+      setShowCpfPrompt(false);
+    } catch(e) { alert('Erro ao salvar CPF: ' + e.message); }
+    finally { setSavingCpf(false); }
+  };
+
   const deletarPaciente = async () => {
     try {
       // Só chama o Supabase se o ID for um UUID válido (pacientes reais)
@@ -82,6 +103,35 @@ function PatientDetail({ patientId, onBack, onGoTo, onNewSessao }) {
         <button className="ghost-btn" onClick={onBack}><I.chevL /> Pacientes</button>
         <span style={{color:'var(--text-3)', fontSize:13}}>/ {pac.nome}</span>
       </div>
+
+      {/* Banner CPF pendente */}
+      {showCpfPrompt && (
+        <div style={{
+          margin:'0 0 12px', padding:'12px 16px',
+          background:'color-mix(in oklab, var(--teal-500) 10%, var(--surface))',
+          border:'1px solid color-mix(in oklab, var(--teal-500) 40%, var(--border))',
+          borderRadius:10, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
+        }}>
+          <span style={{fontSize:13, color:'var(--text-2)', flex:1}}>
+            <strong style={{color:'var(--text)'}}>CPF não cadastrado</strong> — adicione para identificação completa.
+          </span>
+          <div style={{display:'flex', gap:8, alignItems:'center'}}>
+            <input
+              value={cpfInput}
+              onChange={e => setCpfInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && salvarCpf()}
+              placeholder="000.000.000-00"
+              style={{padding:'7px 12px', borderRadius:7, border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text)', fontFamily:'var(--font-mono)', fontSize:13, outline:'none', width:160}}
+            />
+            <button onClick={salvarCpf} disabled={savingCpf || !cpfInput.trim()}
+              style={{padding:'7px 14px', borderRadius:7, border:'none', background:'var(--teal-500)', color:'white', fontWeight:600, fontSize:13, cursor:'pointer', opacity:(!cpfInput.trim()||savingCpf)?0.6:1}}>
+              {savingCpf ? '...' : 'Salvar'}
+            </button>
+            <button onClick={() => setShowCpfPrompt(false)}
+              style={{background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', fontSize:18, padding:'0 4px'}}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="pd-header">
