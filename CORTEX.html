@@ -106,22 +106,51 @@ function App() {
   // Data hydrate
   const hydratePacientes = async (clinicaId) => {
     try {
-      const [pacs, sess, clinica] = await Promise.all([
+      const [pacs, sess, clinica, clinicos] = await Promise.all([
         window.CORTEX_SB.fetchPacientes(clinicaId),
         window.CORTEX_SB.fetchSessoes(clinicaId),
         window.CORTEX_SB.fetchClinica(clinicaId),
+        window.CORTEX_SB.fetchTodosDadosClinicos(clinicaId),
       ]);
-      if (pacs && pacs.length > 0) window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
+
+      if (pacs && pacs.length > 0) {
+        window.CORTEX_DATA.PATIENTS = pacs.map(rowToPaciente);
+      }
+
+      // Injetar anamneses, hipóteses e testes em cada paciente
+      if (clinicos) {
+        const { anamneses, hipoteses, testes } = clinicos;
+
+        window.CORTEX_DATA.PATIENTS.forEach(pac => {
+          // Anamnese
+          const anam = anamneses.find(a => a.paciente_id === pac.id);
+          if (anam) {
+            pac.anamnese = { completude: anam.completude || 0, secoes: anam.secoes || {}, dados: anam.dados || {} };
+          }
+
+          // Hipóteses
+          pac.hipoteses = hipoteses
+            .filter(h => h.paciente_id === pac.id)
+            .map(h => ({ id: h.id, titulo: h.titulo, status: h.status, peso: h.peso, evidencias: h.evidencias || [] }));
+
+          // Testes
+          pac.testes = testes
+            .filter(t => t.paciente_id === pac.id)
+            .map(t => ({ id: t.teste_id, dbId: t.id, status: t.status, prevista: t.prevista, aplicada: t.aplicada, obs: t.obs }));
+        });
+      }
+
       if (sess && sess.length > 0) window.CORTEX_DATA.CALENDAR = sess.map(rowToCalendar);
+
       // Cachear config da clínica no localStorage para uso offline/rápido
       if (clinica?.convenios?.length || clinica?.etapas_fluxo?.length) {
         localStorage.setItem('cortex.config.geral', JSON.stringify({
           convenios: clinica.convenios || [],
           etapas: clinica.etapas_fluxo || [],
         }));
-        // Disparar evento para que GeralTab recarregue se estiver aberta
         window.dispatchEvent(new CustomEvent('cortex-config-updated', { detail: clinica }));
       }
+
       window.dispatchEvent(new CustomEvent('cortex-data-updated'));
     } catch (e) { console.warn('hydratePacientes', e); }
   };
@@ -444,6 +473,7 @@ function rowToPaciente(r) {
     ativo: r.ativo !== false,
     corAvatar: r.cor_avatar || 'violet',
     avatar_url: r.avatar_url || null,
+    clinica_id: r.clinica_id || null,
     criadoEm: r.created_at?.slice(0,10),
     diasNaEtapa: 0,
     testes: [], sessoes: [], hipoteses: [],

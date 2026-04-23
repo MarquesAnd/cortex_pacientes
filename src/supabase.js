@@ -272,6 +272,17 @@ async function updateClinica(clinicaId, patch) {
   });
 }
 
+// ── Buscar todos dados clínicos de todos os pacientes ───────
+async function fetchTodosDadosClinicos(clinicaId) {
+  // Buscar tudo em paralelo
+  const [anamneses, hipoteses, testes] = await Promise.all([
+    sbRest(`/anamneses?clinica_id=eq.${clinicaId}&select=paciente_id,completude,secoes,dados`),
+    sbRest(`/hipoteses?clinica_id=eq.${clinicaId}&select=*&order=created_at.asc`),
+    sbRest(`/testes_paciente?clinica_id=eq.${clinicaId}&select=*&order=created_at.asc`),
+  ]);
+  return { anamneses: anamneses || [], hipoteses: hipoteses || [], testes: testes || [] };
+}
+
 window.CORTEX_SB = {
   sbSession, sbSetSession,
   cortexSignIn, cortexSignUp, cortexSignOut, cortexGetMe, cortexGetProfile, cortexUpdateProfile,
@@ -282,4 +293,5 @@ window.CORTEX_SB = {
   fetchAnamnese, upsertAnamnese,
   fetchRelatorioEscolar, upsertRelatorioEscolar,
   fetchClinica, updateClinica,
+  fetchTodosDadosClinicos,
 };
